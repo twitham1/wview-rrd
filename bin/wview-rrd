@@ -1,33 +1,68 @@
 #!/usr/bin/perl
 
+# wview -> RRD data storage by twitham@sbcglobal.net
+
 use warnings;
 use Carp;
 use RRDs;
-use Data::Dumper;
 
-my $rrdfile = 'wview.rrd';
-my $rainfile = 'rain.rrd';  # needed to track total rain
-my $totalrain = 30;	    # must match database starting rain amount
+my $rrdfile = 'wview.rrd';    # datafeed from station
+my $rainfile = 'rain.rrd';    # added to track total rain
+my $windfile = 'wind.rrd';    # added to track average wind direction
+my $totalrain = 30; # must match database starting rain amount before first run
+my @common = (step	=> 60,	# common shared RRD options
+	      heartbeat	=> 11 * 60,
+	      xff	=> 0.5);
+my @rra	= (join(':', 60 =>	# 1 minute details: 1 month
+		31 * 24 * 60 * 60),
+	   join(':', 5 * 60 =>	# 5 minute archives: 3 months
+		93 * 24 * 60 * 60),
+	   join(':', 60 * 60 =>	# hourly archives: 5 years
+		5 * 366 * 24 * 60 * 60),
+	   join(':', 24 * 60 * 60 => # daily archives: 50 years
+		50 * 366 * 24 * 60 * 60),
+    );
+
 my $wviewrrd = {
-    step	=> 60,
-    heartbeat	=> 11 * 60,
-    xff		=> 0.5,
-#    ds => { sampleRain => 'ABSOLUTE' },
-    rra	=> [[60 =>		# 1 minute details: 30 days
-	     30 * 24 * 60 * 60, 'AVERAGE'],
-	    [5 * 60 =>		# 5 minute archives: 90 days
-	     90 * 24 * 60 * 60, 'AVERAGE', 'MIN', 'MAX'],
-	    [60 * 60 =>		# hourly archives: 5 years
-	     5 * 366 * 24 * 60 * 60, 'AVERAGE', 'MIN', 'MAX'],
-	    [24 * 60 * 60 =>	# daily archives: 50 years
-	     50 * 366 * 24 * 60 * 60, 'AVERAGE', 'MIN', 'MAX'],
+    @common,
+    ds => { 
+	barometer	=> "GAUGE:14:33",
+	stationPressure	=> "GAUGE:14:33",
+	altimeter	=> "GAUGE:14:33",
+	inTemp		=> "GAUGE:-50:200",
+	outTemp		=> "GAUGE:-50:200",
+	inHumidity	=> "GAUGE:0:100",
+	outHumidity	=> "GAUGE:0:100",
+	windSpeed	=> "GAUGE:0:200",
+	windDir		=> "GAUGE:0:360",
+	windGust	=> "GAUGE:0:200",
+	windGustDir	=> "GAUGE:0:360",
+	rainRate	=> "GAUGE:0:100",
+	sampleRain	=> "GAUGE:0:100",
+	dewpoint	=> "GAUGE:-100:200",
+	windchill	=> "GAUGE:-100:200",
+	heatindex	=> "GAUGE:-50:250",
+	sampleET	=> "GAUGE:0:U",
+	radiation	=> "GAUGE:0:U",
+	UV		=> "GAUGE:0:36",
+    },
+    rra => [ "$rra[0]:AVERAGE",
+	     "$rra[1]:AVERAGE:MIN:MAX:LAST",
+	     "$rra[2]:AVERAGE:MIN:MAX:LAST",
+	     "$rra[3]:AVERAGE:MIN:MAX:LAST",
 	],
 };
-my $rainrrd = { %$wviewrrd };	# rain is identical except it needs "LAST":
-map { push @$_, 'LAST' } @{$rainrrd->{rra}};
 
-# print Dumper $rainrrd;
-# exit;
+my $rainrrd = $wviewrrd; # rain is identical
+my $windrrd = {
+    @common,
+    ds => { default => 'ABSOLUTE:0:100' },
+    rra => [ "$rra[0]:AVERAGE",
+	     "$rra[1]:AVERAGE",
+	     "$rra[2]:AVERAGE",
+	     "$rra[3]:AVERAGE",
+	],
+};
 
 # basic station fields from wvtxt A and L lines, in order
 my @FIELD = qw(
@@ -53,7 +88,7 @@ UV
 );
 my $FIELD = join ':', @FIELD;
 
-my $last = 1;
+my $last = 1;			# last update time
 my $ERR;
 if (-s $rrdfile) {
     $last = RRDs::last($rrdfile);
@@ -70,23 +105,22 @@ if (-s $rainfile) {
     $ERR = RRDs::error;
     die "ERROR while reading LAST of $rainfile: $ERR\n" if $ERR;
     ($totalrain) = @$averages;
-#    print Dumper $averages, $totalrain;
-#    exit;
 }
 &catchup($last);
+exit;				# all done
 
+# gather and store all archive records since last update
 sub catchup {
     my($last) = @_;
-    open PIPE, '-|', (qw(./wvtxt localhost), $last) or die $!;
+    open PIPE, '-|', (qw(wview-txt localhost), $last) or die $!;
     select PIPE; $| = 1; select STDOUT; $| = 1;
     while (<PIPE>) {
 	chomp;
 	my($type, $time, @v) = split ':';
 	$type eq 'L' and next;	# ignore LOOPS while getting archives
 #	$type eq 'A' and next;	# ignore archives while getting LOOPS
-	grep s/-100000.000000/U/, @v;
+	grep s/-100000.000000/U/, @v; # unknown wview -> RRD
 	map { $f{$_} = shift @v || 0 } @FIELD;
-
 	&rrdupdate($rrdfile, $FIELD,
 		   (join ':', $time, map { $f{$_} } @FIELD),
 		   $wviewrrd);
@@ -95,7 +129,26 @@ sub catchup {
 	&rrdupdate($rainfile, 'totalRain',
 		   (join ':', $time, $totalrain),
 		   $rainrrd);
+	&wind($time, $f{windDir}, $f{windGustDir});
     }
+}
+
+# count wind direction occurrences into 8 compass buckets
+sub wind {
+    my($time, $adir, $gdir) = @_;
+    my @adir = qw(an ane ae ase as asw aw anw an);
+    my @gdir = qw(gn gne ge gse gs gsw gw gnw gn);
+    my %dir;
+    $dir{$adir[($adir + 22.5) / 45]} = 1
+	unless $adir eq 'U';
+    pop @adir;
+    $dir{$gdir[($gdir + 22.5) / 45]} = 1
+	unless $gdir eq 'U';
+    pop @gdir;
+    &rrdupdate($windfile,
+    	       (join ':', @adir, @gdir),
+    	       (join ':', $time, map { $dir{$_} || 0 } @adir, @gdir),
+    	       $windrrd);
 }
 
 # update an RRD file, creating it if needed
@@ -118,13 +171,18 @@ sub rrdupdate {
 		   '--start' => $start,
 		   '--step'  => $step);
 	for my $ds (split ':', $template) {
-	    my $type = 'GAUGE';
+	    my $text = 'GAUGE:0:U';
+	    defined $rrd->{ds} and defined $rrd->{ds}{default} and
+		$text = $rrd->{ds}{default};
 	    defined $rrd->{ds} and defined $rrd->{ds}{$ds} and
-		$type = $rrd->{ds}{$ds};
-	    push @rrd, "DS:$ds:$type:$heartbeat:0:U"; # fix this (0:U)
+		$text = $rrd->{ds}{$ds};
+	    my($type, $min, $max) = split ':', $text;
+	    defined $min or $min = 0;
+	    defined $max or $max = 'U';
+	    push @rrd, "DS:$ds:$type:$heartbeat:$min:$max";
 	}
 	for my $p (@{$rrd->{rra}}) {
-	    my($per, $total, @cf) = @$p;
+	    my($per, $total, @cf) = split ':', $p;
 	    my $steps = $per / $step;
 	    my $rows = $total / $per;
 	    my $xff = $rrd->{xff} || 0.5;
@@ -132,8 +190,6 @@ sub rrdupdate {
 		push @rrd, "RRA:$cf:$xff:$steps:$rows";
 	    }
 	}
-	# print join "\n", @rrd;
-	# exit;
 	RRDs::create(@rrd);
 	my $err = RRDs::error;
 	croak "ERROR while creating $file: $err\n" if $err;
@@ -143,15 +199,3 @@ sub rrdupdate {
     my $err = RRDs::error;
     carp "ERROR while updating $file: $err\n" if $err;
 }
-
-__END__
-# from wx200d:
-# 91 MB: great zoom for 10 days, 60 days and 5 years + 50 year daily almanac
-$DETAIL  = 10;		# All details, 86400 / $STEP points per day  (10)
-$MINUTE  = 10;		#   1 minute summary,   1440 points per day  (10)
-$FIVEMIN = 60;		#   5 minute summary,    288 points per day  (60)
-$QUARTER = 366 *  5;	# 1/4 hour   summary,     96 points per day  (366 * 5)
-$HOUR    = 366 *  0;	#     hour   summary,     24 points per day  (0)
-$DAY     = 366 * 50;	#     daily  summary,    365 points per year (366 * 50)
-$WEEK    = 366 *  0;	#     weekly summary,     52 points per year (0)
-$MONTH   = 366 *  0;	#   4-week   summary,     13 points per year (0)
