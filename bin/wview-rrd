@@ -2,19 +2,23 @@
 
 # wview -> RRD data storage by twitham@sbcglobal.net
 
-use warnings;
+use strict;
 use Carp;
+use DBI;
 use RRDs;
 
-my $rrdfile = 'wview.rrd';    # datafeed from station
+my $dbfile = '/var/lib/wview/archive/wview-archive.sdb'; # input
+my $dbtable = 'archive';
+my $rrdfile = 'wview.rrd';    # primary data metrics from station
 my $rainfile = 'rain.rrd';    # added to track total rain
 my $windfile = 'wind.rrd';    # added to track average wind direction
 my $totalrain = 30; # must match database starting rain amount before first run
-my @common = (step	=> 60,	# common shared RRD options
+my @common = (step	=> 5 * 60, # common shared RRD options
+#	      step	=> 60,	# common shared RRD options
 	      heartbeat	=> 11 * 60,
 	      xff	=> 0.5);
-my @rra	= (join(':', 60 =>	# 1 minute details: 1 month
-		31 * 24 * 60 * 60),
+my @rra	= (# join(':', 60 =>	# 1 minute details: 1 month
+	   # 	31 * 24 * 60 * 60),
 	   join(':', 5 * 60 =>	# 5 minute archives: 3 months
 		93 * 24 * 60 * 60),
 	   join(':', 60 * 60 =>	# hourly archives: 5 years
@@ -27,7 +31,7 @@ my $wviewrrd = {
     @common,
     ds => { 
 	barometer	=> "GAUGE:14:33",
-	stationPressure	=> "GAUGE:14:33",
+	pressure	=> "GAUGE:14:33",
 	altimeter	=> "GAUGE:14:33",
 	inTemp		=> "GAUGE:-50:200",
 	outTemp		=> "GAUGE:-50:200",
@@ -38,18 +42,16 @@ my $wviewrrd = {
 	windGust	=> "GAUGE:0:200",
 	windGustDir	=> "GAUGE:0:360",
 	rainRate	=> "GAUGE:0:100",
-	sampleRain	=> "GAUGE:0:100",
+	rain		=> "GAUGE:0:100",
 	dewpoint	=> "GAUGE:-100:200",
 	windchill	=> "GAUGE:-100:200",
 	heatindex	=> "GAUGE:-50:250",
-	sampleET	=> "GAUGE:0:U",
-	radiation	=> "GAUGE:0:U",
 	UV		=> "GAUGE:0:36",
     },
-    rra => [ "$rra[0]:AVERAGE",
+    rra => [ "$rra[0]:AVERAGE:MIN:MAX:LAST",
 	     "$rra[1]:AVERAGE:MIN:MAX:LAST",
 	     "$rra[2]:AVERAGE:MIN:MAX:LAST",
-	     "$rra[3]:AVERAGE:MIN:MAX:LAST",
+#	     "$rra[3]:AVERAGE:MIN:MAX:LAST",
 	],
 };
 
@@ -60,14 +62,14 @@ my $windrrd = {
     rra => [ "$rra[0]:AVERAGE",
 	     "$rra[1]:AVERAGE",
 	     "$rra[2]:AVERAGE",
-	     "$rra[3]:AVERAGE",
+#	     "$rra[3]:AVERAGE",
 	],
 };
 
 # basic station fields from wvtxt A and L lines, in order
 my @FIELD = qw(
 barometer
-stationPressure
+pressure
 altimeter
 inTemp
 outTemp
@@ -78,14 +80,13 @@ windDir
 windGust
 windGustDir
 rainRate
-sampleRain
+rain
 dewpoint
 windchill
 heatindex
-sampleET
-radiation
 UV
 );
+
 my $FIELD = join ':', @FIELD;
 
 my $last = 1;			# last update time
@@ -97,10 +98,11 @@ if (-s $rrdfile) {
 }
 if (-s $rainfile) {
     my($averages) = RRDs::graph('',
-				'--start' => time - 30 * 24 * 60 * 60,
+				'--start' => time - 24 * 60 * 60,
 				'--end' => time,
 				"DEF:totalRain=$rainfile:totalRain:LAST",
-				"PRINT:totalRain:LAST:%lf",
+				"VDEF:end=totalRain,LAST",
+				"PRINT:end:%lf",
 	);
     $ERR = RRDs::error;
     die "ERROR while reading LAST of $rainfile: $ERR\n" if $ERR;
@@ -112,25 +114,42 @@ exit;				# all done
 # gather and store all archive records since last update
 sub catchup {
     my($last) = @_;
-    open PIPE, '-|', (qw(wview-txt localhost), $last) or die $!;
-    select PIPE; $| = 1; select STDOUT; $| = 1;
-    while (<PIPE>) {
-	chomp;
-	my($type, $time, @v) = split ':';
-	$type eq 'L' and next;	# ignore LOOPS while getting archives
-#	$type eq 'A' and next;	# ignore archives while getting LOOPS
-	grep s/-100000.000000/U/, @v; # unknown wview -> RRD
-	map { $f{$_} = shift @v || 0 } @FIELD;
+    my $dbh = DBI->connect(          
+	"dbi:SQLite:dbname=$dbfile",
+	"",                          
+	"",                          
+	{ RaiseError => 1 },         
+	) or die $DBI::errstr;
+
+    my $sth = $dbh->prepare(
+	"select * from $dbtable where dateTime > ? order by dateTime ASC");
+    $sth->execute($last);
+
+    my $row;
+    while($row = $sth->fetchrow_hashref()) {
+#    print Dumper \$row;
 	&rrdupdate($rrdfile, $FIELD,
-		   (join ':', $time, map { $f{$_} } @FIELD),
+		   (join ':', $row->{dateTime},
+		    map { &rrdvalue($row->{$_}) } @FIELD),
 		   $wviewrrd);
 
-	$totalrain += $f{sampleRain} || 0;
+	$totalrain += $row->{rain} || 0;
 	&rrdupdate($rainfile, 'totalRain',
-		   (join ':', $time, $totalrain),
+		   (join ':', $row->{dateTime}, $totalrain),
 		   $rainrrd);
-	&wind($time, $f{windDir}, $f{windGustDir});
+
+	&wind($row->{dateTime},
+	      &rrdvalue($row->{windDir}),
+	      &rrdvalue($row->{windGustDir}));
     }
+
+    $sth->finish();
+    $dbh->disconnect();
+}
+
+sub rrdvalue {
+    my($var) = @_;
+    return defined($var) ? $var : 'U';
 }
 
 # count wind direction occurrences into 8 compass buckets
@@ -194,7 +213,7 @@ sub rrdupdate {
 	my $err = RRDs::error;
 	croak "ERROR while creating $file: $err\n" if $err;
     }
-    print "$data\n";
+    print "$data\n" if -t STDIN;
     RRDs::update($file, '--template' => $template, $data);
     my $err = RRDs::error;
     carp "ERROR while updating $file: $err\n" if $err;
