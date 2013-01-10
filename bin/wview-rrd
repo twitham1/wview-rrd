@@ -90,9 +90,11 @@ UV
 my $FIELD = join ':', @FIELD;
 
 my $last = 1;			# last update time
+my $lastyear = -1;		# reset rain each year
 my $ERR;
 if (-s $rrdfile) {
     $last = RRDs::last($rrdfile);
+    $lastyear = (localtime $last)[5];
     $ERR = RRDs::error;
     die "ERROR while reading LAST of $rrdfile: $ERR\n" if $ERR;
 }
@@ -131,8 +133,14 @@ sub catchup {
 	&rrdupdate($rrdfile, $FIELD,
 		   (join ':', $row->{dateTime},
 		    map { &rrdvalue($row->{$_}) } @FIELD),
+
 		   $wviewrrd);
 
+	my $year = (localtime $row->{dateTime})[5];
+	if ($year != $lastyear) {
+	    $totalrain = 0 if $lastyear > -1;
+	    $lastyear = $year;
+	}
 	$totalrain += $row->{rain} || 0;
 	&rrdupdate($rainfile, 'totalRain',
 		   (join ':', $row->{dateTime}, $totalrain),
