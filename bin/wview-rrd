@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
-# wview -> RRD data storage by twitham@sbcglobal.net
+# wview-rrd: wview -> RRD data storage backend by twitham@sbcglobal.net
+# see weather for the CGI graphing frontend
 
 use strict;
 use Carp;
@@ -16,7 +17,8 @@ my $totalrain = 30; # must match database starting rain amount before first run
 my @common = (step	=> 5 * 60, # common shared RRD options
 #	      step	=> 60,	# common shared RRD options
 	      heartbeat	=> 11 * 60,
-	      xff	=> 0.5);
+	      xff	=> 0.5,
+	      start	=> time - 50 * 365 * 24 * 60 * 60);
 my @rra	= (# join(':', 60 =>	# 1 minute details: 1 month
 	   # 	31 * 24 * 60 * 60),
 	   join(':', 5 * 60 =>	# 5 minute archives: 3 months
@@ -99,16 +101,24 @@ if (-s $rrdfile) {
     die "ERROR while reading LAST of $rrdfile: $ERR\n" if $ERR;
 }
 if (-s $rainfile) {
-    my($averages) = RRDs::graph('',
-				'--start' => time - 24 * 60 * 60,
-				'--end' => time,
-				"DEF:totalRain=$rainfile:totalRain:LAST",
-				"VDEF:end=totalRain,LAST",
-				"PRINT:end:%lf",
-	);
-    $ERR = RRDs::error;
-    die "ERROR while reading LAST of $rainfile: $ERR\n" if $ERR;
-    ($totalrain) = @$averages;
+    # why oh why does this fail to see the value I stored a minute ago?
+    # ah, because it's not yet in the 5 MINUTE RRA?!  Hmmmm......
+    # my($averages) = RRDs::graph('',
+    # 				'--start' => time - 20 * 24 * 60 * 60,
+    # 				'--end' => time,
+    # 				'--step' => 1,
+    # 				"DEF:totalRain=$rainfile:totalRain:LAST",
+    # 				"VDEF:end=totalRain,LAST",
+    # 				"PRINT:end:%lf",
+    # 	);
+    # $ERR = RRDs::error;
+    # die "ERROR while reading LAST of $rainfile: $ERR\n" if $ERR;
+    # ($totalrain) = @$averages;
+#    my $tmp = RRDs::dump($rainfile); # goes to STDOUT
+    my $tmp = `rrdtool dump $rainfile | grep last_ds`;
+    $totalrain = $1 if $tmp =~ m@<last_ds>(\S+)</last_ds>@;
+    # print "$totalrain\n";
+    # exit;
 }
 &catchup($last);
 exit;				# all done
