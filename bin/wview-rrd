@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # wview-rrd: wview -> RRD data storage backend by twitham@sbcglobal.net
-# see weather for the CGI graphing frontend
+# see cgi-bin/weather for the CGI graphing frontend
 
 use strict;
 use Carp;
@@ -18,7 +18,8 @@ my @common = (step	=> 5 * 60, # common shared RRD options
 #	      step	=> 60,	# common shared RRD options
 	      heartbeat	=> 11 * 60,
 	      xff	=> 0.5,
-	      start	=> time - 50 * 365 * 24 * 60 * 60);
+	      start	=> (scalar(time) - 10 * 365 * 24 * 60 * 60));
+#	      start	=> 1);
 my @rra	= (# join(':', 60 =>	# 1 minute details: 1 month
 	   # 	31 * 24 * 60 * 60),
 	   join(':', 5 * 60 =>	# 5 minute archives: 3 months
@@ -31,7 +32,7 @@ my @rra	= (# join(':', 60 =>	# 1 minute details: 1 month
 
 my $wviewrrd = {
     @common,
-    ds => { 
+    ds => { 			# creation defaults
 	barometer	=> "GAUGE:14:33",
 	pressure	=> "GAUGE:14:33",
 	altimeter	=> "GAUGE:14:33",
@@ -49,6 +50,10 @@ my $wviewrrd = {
 	windchill	=> "GAUGE:-100:200",
 	heatindex	=> "GAUGE:-50:250",
 	UV		=> "GAUGE:0:36",
+	extraTemp1	=> "GAUGE:-50:200",
+	extraTemp2	=> "GAUGE:-50:200",
+	extraHumid1	=> "GAUGE:0:100",
+	extraHumid2	=> "GAUGE:0:100",
     },
     rra => [ "$rra[0]:AVERAGE:MIN:MAX:LAST",
 	     "$rra[1]:AVERAGE:MIN:MAX:LAST",
@@ -68,7 +73,7 @@ my $windrrd = {
 	],
 };
 
-# basic station fields from wvtxt A and L lines, in order
+# fields to store, in order
 my @FIELD = qw(
 barometer
 pressure
@@ -87,7 +92,12 @@ dewpoint
 windchill
 heatindex
 UV
+extraTemp1
+extraTemp2
+extraHumid1
+extraHumid2
 );
+# TODO: let UV and later be optional/configurable
 
 my $FIELD = join ':', @FIELD;
 
@@ -96,9 +106,9 @@ my $lastyear = -1;		# reset rain each year
 my $ERR;
 if (-s $rrdfile) {
     $last = RRDs::last($rrdfile);
-    $lastyear = (localtime $last)[5];
     $ERR = RRDs::error;
     die "ERROR while reading LAST of $rrdfile: $ERR\n" if $ERR;
+    $lastyear = (localtime $last)[5];
 }
 if (-s $rainfile) {
     # why oh why does this fail to see the value I stored a minute ago?
@@ -203,7 +213,7 @@ sub rrdupdate {
 	}
 	my $step = $rrd->{step} || 60;
 	my $heartbeat = $rrd->{heartbeat} || $step * 3;
-	my $start = $rrd->{start} || time - 366 * 24 * 60 * 60;
+	my $start = $rrd->{start} || (scalar(time) - 366 * 24 * 60 * 60);
 	my @rrd = ($file,
 		   '--start' => $start,
 		   '--step'  => $step);
