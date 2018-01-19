@@ -18,9 +18,13 @@ my $primary	= 'FF0000';	# primary metric color
 my $secondary	= '0000FF';	# secondary metric color
 my $third	= '008800';	# third metric color
 my $indoor	= 'FF8000';	# indoor metric color
+my $garage	= '000000';	# extra sensor 1 (channel 2)
+my $attic	= '888888';	# extra sensor 2 (channel 3)
 
 our $rrd;			# array of graph references
 our($width, @onchange);		# set by rrdgraphcgi.pl
+
+$ENV{PATH} = "/usr/bin:$ENV{PATH}";
 
 $| = 1;
 chdir $where or die $!;
@@ -41,19 +45,13 @@ if (param('footer')) {
 
 my $tr = param('column') ? "<tr><td>" : "";
 
-push @$rrd, "<tr><td>", &outtemp,
-    checkbox(-name => 'inout', @onchange,
-	     -title => 'add indoor metrics to outdoor graphs',
-	     -label => ''),
-    checkbox(-name => 'indoor', @onchange,
-	     -title => 'add indoor graphs',
-	     -label => '');
+push @$rrd, "<tr><td>", &outtemp;
 push @$rrd, &intemp if param('indoor');
 push @$rrd, $tr, &humidity;
 push @$rrd, &inhumidity if param('indoor');
 push @$rrd, $tr, &wind,
-    checkbox(-name => 'dir', @onchange,
-	     -title => 'show direction counts',
+    checkbox(-name => 'count', @onchange,
+	     -title => 'direction counts rather than percents',
 	     -label => '');
 push @$rrd, $tr, &barometer,
     checkbox(-name => 'pressure', @onchange,
@@ -61,7 +59,7 @@ push @$rrd, $tr, &barometer,
 	     -label => '');
 push @$rrd, $tr, &rain;
 push @$rrd, $tr, &rainrate;
-push @$rrd, $tr, &uv;
+#push @$rrd, $tr, &uv;
 
 if (my $graph = param('graph')) {
 
@@ -69,13 +67,29 @@ if (my $graph = param('graph')) {
 
 } else {
 
-    &rrdheader('Wview Weather', undef, undef, undef, undef,
-	[checkbox(-name => 'column', @onchange,
-		  -title => 'show graphs in columns')]);
+    &rrdheader('Wview Weather', undef, undef,
+	       [' See also: ', a({-href => '/weather/'}, 'wview page')],
+	       undef,
+	       [checkbox(-name => 'column', @onchange,
+			 -title => 'show graphs in columns'),
+		checkbox(-name => 'inout', @onchange,
+			 -title => 'add indoor metrics to outdoor graphs'),
+		checkbox(-name => 'indoor', @onchange,
+			 -title => 'add indoor graphs'),
+		(param('inout') || param('indoor') ?
+		 (checkbox(-name => 'garage', @onchange,
+			   -title => 'add garage sensor'),
+		  checkbox(-name => 'attic', @onchange,
+			   -title => 'add attic sensor')) : ()),
+	       ]);
 
-    &rrdtable($rrd);
+    if (my $g = param('graphtime')) {
+	&rrdgraphtime($g);
+    } else {
+	&rrdtable($rrd);
+    }
 
-    print "<hr>\ngenerated from ",
+    print qq'<hr class="footer">\ngenerated from ',
     &link("3 rrd files", { footer => 1}, 'RRD Info'),
     ", last modified ", scalar(localtime((stat $wview)[9])), "\n";
 
@@ -84,9 +98,13 @@ if (my $graph = param('graph')) {
 
 sub outtemp {
     return [
-	'Temperature', qw(-v), 'Degrees Fahrenheit',
+	'Temperature', qw(-Y -v), 'Degrees Fahrenheit',
 	(param('inout')
-	 ? &range($wview, 'inTemp', 'INDOOR     ', $indoor)
+	 ? ((param('attic') ?
+	     &range($wview, 'extraTemp2', 'Attic      ', $attic) : ()),
+	    (param('garage') ?
+	     &range($wview, 'extraTemp1', 'Garage     ', $garage) : ()),
+	    &range($wview, 'inTemp',     'INDOOR     ', $indoor))
 	 :()),
 	&range($wview, 'heatindex', 'Heat Index ', $secondary),
 	&range($wview, 'windchill', 'Wind Chill ', $secondary),
@@ -95,6 +113,7 @@ sub outtemp {
 	(param('inout')
 	 ? "LINE2:avginTemp#$indoor"
 	 : ()),
+	"HRULE:32#0000FF88",	# freeze line
 	"LINE2:avgheatindex#$secondary",
 	"LINE2:avgwindchill#$secondary",
 	"LINE2:avgdewpoint#$third",
@@ -104,16 +123,25 @@ sub outtemp {
 
 sub intemp {
     return [
-	'INDOOR Temperature', qw(-v), 'Degrees Fahrenheit',
-	&range($wview, 'inTemp',   'INDOOR Temperature', $indoor),
+	'INDOOR Temperature', qw(-Y -v), 'Degrees Fahrenheit',
+	(param('attic') ?
+	 &range($wview, 'extraTemp2', 'Attic  Temperature', $attic) : ()),
+	(param('garage') ?
+	 &range($wview, 'extraTemp1', 'Garage Temperature', $garage) : ()),
+	&range($wview, 'inTemp',     'INDOOR Temperature', $indoor),
+	"HRULE:32#0000FF88",	# freeze line
 	];
 }
 
 sub humidity {
     return [
-	'Humidity', qw(-v), 'Percent',
+	'Humidity', qw(-Y -v), 'Percent',
 	(param('inout')
-	 ? &range($wview, 'inHumidity', 'INDOOR  ', $indoor)
+	 ? ((param('attic') ?
+	     &range($wview, 'extraHumid2', 'Attic   ', $attic) : ()),
+	    (param('garage') ?
+	     &range($wview, 'extraHumid1', 'Garage  ', $garage) : ()),
+	    &range($wview, 'inHumidity',  'INDOOR  ', $indoor))
 	 :()),
 	&range($wview, 'outHumidity',   'Humidity', $primary),
 	];
@@ -121,8 +149,12 @@ sub humidity {
 
 sub inhumidity {
     return [
-	'INDOOR Humidity', qw(-v), 'Percent',
-	&range($wview, 'inHumidity', 'INDOOR Humidity', $indoor),
+	'INDOOR Humidity', qw(-Y -v), 'Percent',
+	(param('attic') ?
+	 &range($wview, 'extraHumid2', 'Attic  Humidity', $attic) : ()),
+	(param('garage') ?
+	 &range($wview, 'extraHumid1', 'Garage Humidity', $garage) : ()),
+	&range($wview, 'inHumidity',  'INDOOR Humidity', $indoor),
 	];
 }
 
@@ -131,53 +163,80 @@ sub inhumidity {
 # gust and average direction.
 sub wind {
     my @wind = (
-	'Wind', qw(-v), 'Miles Per Hour',
-	&range($wview, 'windGust',  'Gust   ', $secondary),
-	&range($wview, 'windSpeed', 'Average', $primary),
+	'Wind', qw(-u 10 -Y -v), 'Miles Per Hour',
+	&range($wview, 'windGust',  'Gust   ', $secondary, 0,
+	       "COMMENT:Dir ==  0/ -5"),
+	&range($wview, 'windSpeed', 'Average', $primary, 0,
+	       "COMMENT:Dir == -5/-10"),
 	"LINE2:avgwindGust#$secondary",
 	"LINE2:avgwindSpeed#$primary",
 	);
-    my @dir = qw(n ne e se s sw w nw); # wind compass buckets in order
-    my %dir = (		 # color and optional label for each direction
-	n   => '00FFFF',
-	ne  => '0040FF',
-	e   => '8000FF',
-	se  => 'FF00BF:     Gust     Average',
-	's' => 'FF0000:    0 / -5    -5 /-10',
-	sw  => 'FF8000',
-	w   => 'FFFF00',
-	nw  => '00FF40');
+    my @rose = qw(nw n ne w 0 e sw s se); # wind compass buckets in 3x3 order
+    my @dir = grep $_, @rose;	# directions only (no center), colors:
+    my %dir = qw(
+	nw 0000FF	n 00FFFF	ne 00FF00
+	w  800080	0 FFFFFF	e  FFFF00
+	sw FF00FF	s FF0000	se FF8000);
+    my @doc = ("COMMENT:            (N = cold = blues)\\l",
+	       "COMMENT:(W = sunset = dark) * (E = sunrise = bright)\\l",
+	       "COMMENT:             (S = hot = reds)\\l");
     for (@dir) {
-	push @wind, "DEF:a$_=$wind:a$_:AVERAGE";
 	push @wind, "DEF:g$_=$wind:g$_:AVERAGE";
-	push @wind, "VDEF:avga$_=a$_,TOTAL";
-	push @wind, "VDEF:avgg$_=g$_,TOTAL";
+	push @wind, "DEF:a$_=$wind:a$_:AVERAGE";
     }
-    push @wind, join ',', "CDEF:amax=0", map { "a$_,MAX" } @dir;
     push @wind, join ',', "CDEF:gmax=0", map { "g$_,MAX" } @dir;
-    for (@dir) {
+    push @wind, join ',', "CDEF:amax=0", map { "a$_,MAX" } @dir;
+    push @wind, join ',', "CDEF:gtot=0", map { "g$_,+" } @dir;
+    push @wind, join ',', "CDEF:atot=0", map { "a$_,+" } @dir;
+    my $i = 0;
+    my @later;	       # defer gust directions to overlay all averages
+    for (@rose) {		# 3x3 compass rose directions
+	$i++;
+	my $color = $dir{$_};
+	unless ($_) {		# rose center is just legend labels
+	    my $chr = param('count') ? '#' : '%';
+	    push @wind, "CDEF:null=gmax,0,MIN";
+	    push @wind, "AREA:null#$color: ";
+	    push @wind, "COMMENT:Gust$chr";
+	    push @wind, "COMMENT:Average$chr";
+	    next;
+	}
+	# plot only the most common bucket direction as an area
 	my $chr = length($_) < 2 ? ' ' : '';
-	my($color, $label) = split ':', "$dir{$_}:";
-	$label .= "\\l";
-	push @wind, "CDEF:aplot$_=a$_,amax,GE,-10,0,IF";
-	push @wind, "CDEF:gplot$_=g$_,gmax,GE,-5,0,IF";
+	push @wind, "CDEF:gplot$_=g$_,0,GT,g$_,gmax,GE,-5,0,IF,0,IF";
+	push @wind, "CDEF:aplot$_=a$_,0,GT,a$_,amax,GE,-10,0,IF,0,IF";
 	push @wind, "AREA:aplot$_#$color:\U$_$chr";
-	push @wind, "AREA:gplot$_#$color";
-	next unless param('dir');
-	push @wind, "GPRINT:avgg$_:%6.0lf";
-	push @wind, "GPRINT:avga$_:%6.0lf$label";
+	push @later, "AREA:gplot$_#$color"; # defer gust overlay
+	if (param('count')) {	# bucket counts in the legend
+	    push @wind, "VDEF:totg$_=g$_,TOTAL";
+	    push @wind, "VDEF:tota$_=a$_,TOTAL";
+	    push @wind, "GPRINT:totg$_:%6.0lf";
+	    push @wind, "GPRINT:tota$_:%6.0lf";
+	} else {		# bucket percentages in the legend
+	    push @wind, "CDEF:gpct$_=g$_,gtot,/,100,*";
+	    push @wind, "VDEF:pctg$_=gpct$_,AVERAGE";
+	    push @wind, "CDEF:apct$_=a$_,atot,/,100,*";
+	    push @wind, "VDEF:pcta$_=apct$_,AVERAGE";
+	    push @wind, "GPRINT:pctg$_:%5.1lf%%";
+	    push @wind, "GPRINT:pcta$_:%5.1lf%%";
+	}
+	$i % 3 and next;
+	push @wind, ($width > 600 ? (shift @doc) : "COMMENT:\\l");
     }
+    push @wind, @later;	# gust directions overlay now that average is done
     return [ @wind ];
 }
 
 sub barometer {
     return [
-	'Barometer', qw(-v), 'Inches of Mercury',
+	'Barometer', qw(-Y -v), 'Inches of Mercury',
 	(param('pressure')
 	 ? &range($wview, 'pressure',  'Pressure ', $third)
 	 : ()),
 	&range($wview, 'altimeter', 'Altimeter', $secondary),
 	&range($wview, 'barometer', 'Barometer', $primary),
+	"HRULE:29.92#0000FF88",	# standard atmosphere
+	"HRULE:29.53#0000FF88",	# 1 bar = standard pressure
 	"LINE2:avgaltimeter#$secondary",
 	"LINE2:avgbarometer#$primary",
 	];
@@ -185,14 +244,19 @@ sub barometer {
 
 sub rain {
     return [
-	'Rain', qw(-v), 'Inches',
+	'Rain', qw(-Y -v), 'Inches',
 	&range($rain, 'totalRain', 'Rain', $primary),
 
-#	"CDEF:sum=PREV,UN,0,PREV,IF,lasttotalRain,PREV(lasttotalRain),-,+",
+	"CDEF:rain=lasttotalRain,UN,PREV,lasttotalRain,IF", # U->same
+	"CDEF:delta=rain,PREV(rain),UN,rain,PREV(rain),IF,-", # change
+	"CDEF:add=delta,-0.0001,LT,rain,delta,IF", # counter reset
+	"CDEF:sum=PREV,UN,0,PREV,IF,add,+", # running sum of rain
 
-	"CDEF:sum=PREV,UN,0,PREV,IF,DUP,"
-	. "lasttotalRain,UN,0,lasttotalRain,IF"
-	. ",mintotalRain,UN,0,mintotalRain,IF,-,+,MAX",
+	# "CDEF:rain=lasttotalRain,UN,PREV,lasttotalRain,IF", # U->same
+	# "CDEF:delta=rain,PREV(rain),UN,rain,PREV(rain),IF,-", # change
+	# "CDEF:alt=maxtotalRain,mintotalRain,-",		      # range
+	# "CDEF:add=delta,-0.0001,LT,rain,delta,alt,MAX,IF", # counter reset
+	# "CDEF:sum=PREV,UN,0,PREV,IF,add,+", # running sum of rain
 
 	"VDEF:sumRain=sum,LAST",
 	"GPRINT:sumRain:(%.2lf inches of Rain to",
@@ -202,14 +266,14 @@ sub rain {
 
 sub rainrate {
     return [
-	'Rain Rate', qw(-v), 'Inches Per Hour',
+	'Rain Rate', qw(-Y -v), 'Inches Per Hour',
 	&range($wview, 'rainRate', 'Rain Rate', $primary),
 	];
 }
 
 sub uv {
     return [
-	'Ultra Violet', qw(-v), 'Ultra Violet Index',
+	'Ultra Violet', qw(-Y -v), 'Ultra Violet Index',
 	&range($wview, 'UV', 'Ultra Violet', $primary),
 	];
 }
@@ -218,7 +282,7 @@ BEGIN {
     my $offset = 0;			# dash-offset
 # return RRD code to plot range of given $var from $file in $color
 sub range {
-    my($file, $var, $label, $color, $alpha) = @_;
+    my($file, $var, $label, $color, $alpha, $more) = @_;
     $label = $var unless $label;
     $color = '000000' unless $color;
     $alpha = '88' unless $alpha;
@@ -245,7 +309,8 @@ sub range {
 	"GPRINT:avgavg$var:%6.2lf  <",
 	"GPRINT:maxmax$var:%6.2lf)",
 	"GPRINT:lastlast$var:%6.2lf",
-	($width > 500
+	($more ? $more : ()),
+	($width > 600
 	 ? ("GPRINT:minmin$var:(%a %b %d %H\\:%M %Y  <:strftime",
 	    "GPRINT:maxmax$var:%a %b %d %H\\:%M %Y)\\l:strftime")
 	 : ("COMMENT:\\l")),
