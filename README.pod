@@ -1,0 +1,80 @@
+
+=head1 NAME
+
+wview-rrd - Interactive RRDTool graphs for wview weather stations
+
+=head1 DESCRIPTION
+
+B<wview-rrd> updates Round Robin Database files from a local wview
+SQLite database file.  B<cgi-bin/weather> then generates interactive
+graphs of the weather data from these RRD files to a web browser.
+
+Features of the CGI web interface include:
+
+  * show all weather variables in high resolution time series graphs
+  * zoom in or scroll the displayed time frame of the graphs
+  * change graph plot size (width x height)
+  * change data resolution - detailed, hourly, daily and so on
+  * at wider resolutions, show average line an min/max area
+  * add extra sensor data
+  * show (min < avg < max) last, of plotted data in the legend
+  * show many times of a graph at once (just click a graph)
+  * export the data of any graph to csv, xml, json or see RRD code
+  * all widgets / links have mouse balloon tooltip clues
+
+See B<EXAMPLES> below for an example web site.
+
+=head1 INSTALLATION
+
+Install the data collector and data presentation code:
+
+	cp -p or ln -s bin/* to /usr/bin/ or the location of other wv* code
+
+	cp -p or ln -s cgi-bin/* to your web server's cgi-bin/ directory
+
+This tracks accumulated rain per year.  So, you can optionally find
+out how many inches of rain you had in the year up to the start date
+of your station.  This needs passed to wview-rrd only 1 time when it
+first generates the RRD files.  If you don't know, the default is 0.
+Run as root, passing starting inches of rain as the only argument:
+
+	umask 022
+	cd /var/lib/wview/archive # location of wview-archive.sdb
+	wview-rrd 6.17 # where "6.17" is inches of rain to start, or 0
+
+Be patient - this first run will take a while as the RRD files are
+updated with all your weather data.  Confirm 3 RRD files are created
+in the current directory, along side the wview-archive.sdb source
+database file.  After finished, run wview-rrd with no arguments and it
+should complete much faster as it just adds any new data.
+
+Set up automated updates of the RRD files after generating the HTML
+files.  Do this by adding a few lines to /etc/wview/post-generate.sh:
+
+	umask 022
+	cd /var/lib/wview/archive # location of wview-archive.sdb
+	wview-rrd > /tmp/wview-rrd.log 2>&1 &
+
+Now http://localhost/cgi-bin/weather should show all the data from the
+RRD files.  If not, check the web server log for errors.
+
+=head1 EXAMPLES
+
+http://twitham.homelinux.org/cgi-bin/weather
+
+=head1 SEE ALSO
+
+rrdtool(1), http://www.wviewweather.com/
+
+=head1 AUTHOR
+
+Timothy D Witham <twitham@sbcglobal.net>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2012-2018 Timothy D Witham.
+
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

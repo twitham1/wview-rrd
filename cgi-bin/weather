@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # weather: RRD CGI graphing frontend by twitham@sbcglobal.net
-# see wview-rrd for the backend data storage job
+# see wview-rrd for the backend data storage job, 2013/01
 
 use strict;
 use CGI qw/:all/;
