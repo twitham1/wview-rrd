@@ -1,19 +1,25 @@
 #!/usr/bin/perl
 
 # wview-rrd: wview -> RRD data storage backend by twitham@sbcglobal.net
-# see cgi-bin/weather for the CGI graphing frontend
+# see cgi-bin/weather for the CGI graphing frontend, 2013/01
 
 use strict;
 use Carp;
 use DBI;
 use RRDs;
 
-my $dbfile = '/var/lib/wview/archive/wview-archive.sdb'; # input
+my $totalrain = 0;    # must match YTD starting rain in first run only
+if (@ARGV) {
+    $ARGV[0] =~ /^\d+(\.\d+)?$/
+	? $totalrain = $ARGV[0]
+	: die "usage: $0 [N.NN] # starting rain in inches YTD\n";
+}
+my $dbfile = './wview-archive.sdb'; # input wview database
+-f $dbfile or die "$0: $dbfile not found, wrong cwd?\n";
 my $dbtable = 'archive';
 my $rrdfile = 'wview.rrd';    # primary data metrics from station
 my $rainfile = 'rain.rrd';    # added to track total rain
 my $windfile = 'wind.rrd';    # added to track average wind direction
-my $totalrain = 30; # must match database starting rain amount before first run
 my @common = (step	=> 5 * 60, # common shared RRD options
 #	      step	=> 60,	# common shared RRD options
 	      heartbeat	=> 11 * 60,
@@ -136,11 +142,11 @@ exit;				# all done
 # gather and store all archive records since last update
 sub catchup {
     my($last) = @_;
-    my $dbh = DBI->connect(          
+    my $dbh = DBI->connect(
 	"dbi:SQLite:dbname=$dbfile",
-	"",                          
-	"",                          
-	{ RaiseError => 1 },         
+	"",
+	"",
+	{ RaiseError => 1, ReadOnly => 1 },
 	) or die $DBI::errstr;
 
     my $sth = $dbh->prepare(
