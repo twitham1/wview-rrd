@@ -65,8 +65,6 @@ sub rrdgraph {
 
 	my $time = localtime $end;
 	$time =~ s/:\d\d / /;
-	$time = strftime(sprintf('%d ww%02d', &ww($end)) . '.%w %a %b %d',
-			 localtime $end);
 
 	# graph can optionally set its title if 2nd arg contains TIME:
 	my $span = &secformat($end - $start);
@@ -504,31 +502,6 @@ sub link {    # return a link to myself or $prg, with given params set
     $aref->{-title} = $title if $title;
     $name = escapeHTML $name unless $name =~ /<img/;
     return a($aref, $name);
-}
-
-# This is the shortest working workweek formula that I am aware of. -twitham
-
-# Submitted to AEC by Tim Beatty sometime before 3/16/1997 when Paul
-# Balyoz installed it in /stor/common/lib/perl.
-
-# Input:  current time in seconds since 1970
-# Output: 4-digit Intel YEAR, 1 or 2 digit Intel WORKWEEK
-sub ww {
-    my $time = shift || time;
-    my $DAY = 24 * 60 * 60;
-    my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday) = localtime $time;
-
-# Go to the end of the work week (Saturday).
-# The first WW has Jan. 1 in that week.  So we need to account for
-# the last week of the year which can be the first work week of
-# the next year.  $yday helps us because it's the number of days since
-# Jan 1 of the current year.
-
-    $time += $DAY * (6 - $wday);
-    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday) = localtime $time;
-
-# The number of Sundays + 1 is the workweek number.
-    return 1900 + $year, int($yday / 7) + 1;
 }
 
 1;				# return true
