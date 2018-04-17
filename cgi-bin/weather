@@ -15,6 +15,7 @@ our $where = "/var/lib/wview/archive"; # path to RRD files
 our $wview	= "wview.rrd";	# main RRD file
 our $wind	= "wind.rrd";	# wind directions
 our $rain	= "rain.rrd";	# rain total
+our $title	= 'Wview Weather'; # title for the page
 our $primary	= 'FF0000';	# primary metric color
 our $secondary	= '0000FF';	# secondary metric color
 our $third	= '008800';	# third metric color
@@ -23,6 +24,9 @@ our $name1	= 'Extra1';	# one-word name for:
 our $color1	= '000000';	#   extra sensor 1
 our $name2	= 'Extra2';	# one-word name for:
 our $color2	= '888888';	#   extra sensor 2
+our $link	= '';		# optional header HTML, like:
+# $link = ' See also: '. a({-href => '/weather/'}, 'wview page');
+
 
 $ENV{PATH} = "/usr/bin:$ENV{PATH}";
 
@@ -74,8 +78,8 @@ if (my $graph = param('graph')) {
 
 } else {
 
-    &rrdheader('Wview Weather', undef, undef,
-	       [' See also: ', a({-href => '/weather/'}, 'wview page')],
+    &rrdheader($title, undef, undef,
+	       [$link ? $link : ''],
 	       undef,
 	       [checkbox(-name => 'column', @onchange,
 			 -title => 'show graphs in columns'),
