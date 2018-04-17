@@ -33,6 +33,9 @@ Install the data collector and data presentation code:
 
 	cp -p or ln -s cgi-bin/* to your web server's cgi-bin/ directory
 
+	edit cgi-bin/weather.pl config file as needed - make sure
+	$where is the directory that holds your weather .sdb files.
+
 http://localhost/cgi-bin/weather should now show an interface, but
 with broken graphs since the RRD files don't yet exist.  Click y and
 << a couple times to zoom out to a 4 year view.  You can refresh this
