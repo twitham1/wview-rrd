@@ -102,7 +102,9 @@ if (my $graph = param('graph')) {
 
     print qq'<hr class="footer">\ngenerated from ',
     &link("3 rrd files", { footer => 1}, 'RRD Info'),
-    ", last modified ", scalar(localtime((stat $wview)[9])), "\n";
+    ", last modified ", scalar(localtime((stat $wview)[9])),
+    " by ", a({-href => 'https://github.com/twitham1/wview-rrd'},
+	      'wview-rrd'), "\n";
 
     print end_form, end_html;
 }
