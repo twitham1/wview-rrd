@@ -7,24 +7,29 @@ use strict;
 use CGI qw/:all/;
 use CGI::Carp qw(fatalsToBrowser);
 our($inc, $basename) = ($0 =~ m@(.*)/(.*)$@);
-
 require "$inc/rrdgraphcgi.pl";
 
-my $where = "/var/lib/wview/archive";
-my $wview = "wview.rrd";	# main RRD file
-my $wind  = "wind.rrd";		# wind directions
-my $rain  = "rain.rrd";	      	# rain total
-my $primary	= 'FF0000';	# primary metric color
-my $secondary	= '0000FF';	# secondary metric color
-my $third	= '008800';	# third metric color
-my $indoor	= 'FF8000';	# indoor metric color
-my $garage	= '000000';	# extra sensor 1 (channel 2)
-my $attic	= '888888';	# extra sensor 2 (channel 3)
+# ------------------------------------------------------------
+
+our $where = "/var/lib/wview/archive";
+our $wview = "wview.rrd";	# main RRD file
+our $wind  = "wind.rrd";	# wind directions
+our $rain  = "rain.rrd";	# rain total
+our $primary	= 'FF0000';	# primary metric color
+our $secondary	= '0000FF';	# secondary metric color
+our $third	= '008800';	# third metric color
+our $indoor	= 'FF8000';	# indoor metric color
+our $garage	= '000000';	# extra sensor 1 (channel 2)
+our $attic	= '888888';	# extra sensor 2 (channel 3)
+
+$ENV{PATH} = "/usr/bin:$ENV{PATH}";
+
+# override anything above in configuation file
+-f "$0.pl" and ! -w  and require "$0.pl";
+# ------------------------------------------------------------
 
 our $rrd;			# array of graph references
 our($width, @onchange);		# set by rrdgraphcgi.pl
-
-$ENV{PATH} = "/usr/bin:$ENV{PATH}";
 
 $| = 1;
 chdir $where or die $!;
