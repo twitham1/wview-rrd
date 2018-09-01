@@ -4,11 +4,15 @@
 # see cgi-bin/weather for the CGI graphing frontend, 2013/01
 
 use strict;
+use Getopt::Std;
 use Carp;
 use DBI;
 use RRDs;
+use vars qw/ $opt_m /;
 
 my $totalrain = 0;    # must match YTD starting rain in first run only
+
+getopts('m');
 if (@ARGV) {
     $ARGV[0] =~ /^\d+(\.\d+)?$/
 	? $totalrain = $ARGV[0]
@@ -58,6 +62,29 @@ my $wviewrrd = {
 	UV		=> "GAUGE:0:36",
 	extraTemp1	=> "GAUGE:-50:200",
 	extraTemp2	=> "GAUGE:-50:200",
+	extraHumid1	=> "GAUGE:0:100",
+	extraHumid2	=> "GAUGE:0:100",
+    },
+    metricds => { 			# creation defaults
+	barometer	=> "GAUGE:500:1500",
+	pressure	=> "GAUGE:500:1500",
+	altimeter	=> "GAUGE:500:1500",
+	inTemp		=> "GAUGE:-20:40",
+	outTemp		=> "GAUGE:-40:60",
+	inHumidity	=> "GAUGE:0:100",
+	outHumidity	=> "GAUGE:0:100",
+	windSpeed	=> "GAUGE:0:250",
+	windDir		=> "GAUGE:0:360",
+	windGust	=> "GAUGE:0:250",
+	windGustDir	=> "GAUGE:0:360",
+	rainRate	=> "GAUGE:0:100",
+	rain		=> "GAUGE:0:2000",
+	dewpoint	=> "GAUGE:-40:60",
+	windchill	=> "GAUGE:-40:60",
+	heatindex	=> "GAUGE:-40:60",
+	UV		=> "GAUGE:0:36",
+	extraTemp1	=> "GAUGE:-40:60",
+	extraTemp2	=> "GAUGE:-40:60",
 	extraHumid1	=> "GAUGE:0:100",
 	extraHumid2	=> "GAUGE:0:100",
     },
@@ -155,7 +182,11 @@ sub catchup {
 
     my $row;
     while($row = $sth->fetchrow_hashref()) {
-#    print Dumper \$row;
+	# print Dumper \$row;
+	if ($opt_m) {
+	    &tometric(\$row);
+	}
+
 	&rrdupdate($rrdfile, $FIELD,
 		   (join ':', $row->{dateTime},
 		    map { &rrdvalue($row->{$_}) } @FIELD),
@@ -204,9 +235,42 @@ sub wind {
     	       $windrrd);
 }
 
+sub tometric {
+    my($data) = @_;
+
+    use constant FTOC_OFFSET => -32.0;
+    use constant FTOC_GAIN   => (5.0/9.0);
+    use constant INCHES2MM   => 25.4;
+    use constant MILES2KM    => 1.609344;
+    use constant INHG2MB     => 33.86389;
+
+    # C to F
+    $$data->{outTemp} = ($$data->{outTemp} + FTOC_OFFSET) * FTOC_GAIN;
+    $$data->{inTemp} = ($$data->{inTemp} + FTOC_OFFSET) * FTOC_GAIN;
+    $$data->{dewpoint} = ($$data->{dewpoint} + FTOC_OFFSET) * FTOC_GAIN;
+    $$data->{windchill} = ($$data->{windchill} + FTOC_OFFSET) * FTOC_GAIN;
+    $$data->{heatindex} = ($$data->{heatindex} + FTOC_OFFSET) * FTOC_GAIN;
+    $$data->{extraTemp1} = ($$data->{extraTemp1} + FTOC_OFFSET) * FTOC_GAIN;
+    $$data->{extraTemp2} = ($$data->{extraTemp2} + FTOC_OFFSET) * FTOC_GAIN;
+
+    # inches to mm
+    $$data->{rain} = $$data->{rain} * INCHES2MM;
+    $$data->{rainRate} = $$data->{rainRate} * INCHES2MM;
+
+    # mph to kmh
+    $$data->{windSpeed} = $$data->{windSpeed} * MILES2KM;
+    $$data->{windGust} = $$data->{windGust} * MILES2KM;
+
+    # inHg to mbar
+    $$data->{barometer} = $$data->{barometer} * INHG2MB;
+    $$data->{pressure} = $$data->{pressure} * INHG2MB;
+    $$data->{altimeter} = $$data->{altimeter} * INHG2MB;
+}
+
 # update an RRD file, creating it if needed
 sub rrdupdate {
     my($file, $template, $data, $rrd) = @_;
+    my $dstype = $opt_m ? "metricds" : "ds";
 
     unless (-s $file) {
 	my @path = split '/', $file;
@@ -225,10 +289,10 @@ sub rrdupdate {
 		   '--step'  => $step);
 	for my $ds (split ':', $template) {
 	    my $text = 'GAUGE:0:U';
-	    defined $rrd->{ds} and defined $rrd->{ds}{default} and
-		$text = $rrd->{ds}{default};
-	    defined $rrd->{ds} and defined $rrd->{ds}{$ds} and
-		$text = $rrd->{ds}{$ds};
+	    defined $rrd->{$dstype} and defined $rrd->{$dstype}{default} and
+		$text = $rrd->{$dstype}{default};
+	    defined $rrd->{$dstype} and defined $rrd->{$dstype}{$ds} and
+		$text = $rrd->{$dstype}{$ds};
 	    my($type, $min, $max) = split ':', $text;
 	    defined $min or $min = 0;
 	    defined $max or $max = 'U';

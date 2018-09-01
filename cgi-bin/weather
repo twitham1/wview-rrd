@@ -26,7 +26,7 @@ our $name2	= 'Extra2';	# one-word name for:
 our $color2	= '888888';	#   extra sensor 2
 our $link	= '';		# optional header HTML, like:
 # $link = ' See also: '. a({-href => '/weather/'}, 'wview page');
-
+our $metric = 0;
 
 $ENV{PATH} = "/usr/bin:$ENV{PATH}";
 
@@ -111,7 +111,7 @@ if (my $graph = param('graph')) {
 
 sub outtemp {
     return [
-	'Temperature', qw(-Y -v), 'Degrees Fahrenheit',
+	'Temperature', qw(-Y -v), $metric ? 'Degrees Celsius' : 'Degrees Fahrenheit',
 	(param('inout')
 	 ? ((param(lc $name2) ?
 	     &range($wview, 'extraTemp2',
@@ -138,7 +138,7 @@ sub outtemp {
 
 sub intemp {
     return [
-	'INDOOR Temperature', qw(-Y -v), 'Degrees Fahrenheit',
+	'INDOOR Temperature', qw(-Y -v), $metric ? 'Degrees Celsius' : 'Degrees Fahrenheit',
 	(param(lc $name2) ?
 	 &range($wview, 'extraTemp2',
 		sprintf('%-6s Temperature', $name2), $color2) : ()),
@@ -184,7 +184,7 @@ sub inhumidity {
 # gust and average direction.
 sub wind {
     my @wind = (
-	'Wind', qw(-u 10 -Y -v), 'Miles Per Hour',
+	'Wind', qw(-u 10 -Y -v), $metric ? 'kmh' : 'Miles Per Hour',
 	&range($wview, 'windGust',  'Gust   ', $secondary, 0,
 	       "COMMENT:Dir ==  0/ -5"),
 	&range($wview, 'windSpeed', 'Average', $primary, 0,
@@ -250,7 +250,7 @@ sub wind {
 
 sub barometer {
     return [
-	'Barometer', qw(-Y -v), 'Inches of Mercury',
+	'Barometer', qw(-Y -v), $metric ? 'mbar ' : 'Inches of Mercury',
 	(param('pressure')
 	 ? &range($wview, 'pressure',  'Pressure ', $third)
 	 : ()),
@@ -265,7 +265,7 @@ sub barometer {
 
 sub rain {
     return [
-	'Rain', qw(-Y -v), 'Inches',
+	'Rain', qw(-Y -v), $metric ? 'mm' : 'Inches',
 	&range($rain, 'totalRain', 'Rain', $primary),
 
 	"CDEF:rain=lasttotalRain,UN,PREV,lasttotalRain,IF", # U->same
@@ -287,7 +287,7 @@ sub rain {
 
 sub rainrate {
     return [
-	'Rain Rate', qw(-Y -v), 'Inches Per Hour',
+	'Rain Rate', qw(-Y -v), $metric ? 'mmh' : 'Inches Per Hour',
 	&range($wview, 'rainRate', 'Rain Rate', $primary),
 	];
 }

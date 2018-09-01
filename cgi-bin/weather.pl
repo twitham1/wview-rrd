@@ -12,4 +12,6 @@ our $name2 = 'Attic';		# extra sensor 2
 
 our $link = ' See also: '. a({-href => '/weather/'}, 'wview page');
 
+our $metric = 0;
+
 1;
