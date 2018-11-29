@@ -26,6 +26,8 @@ our $name2	= 'Extra2';	# one-word name for:
 our $color2	= '888888';	#   extra sensor 2
 our $link	= '';		# optional header HTML, like:
 # $link = ' See also: '. a({-href => '/weather/'}, 'wview page');
+our %def = qw(temp F speed mph press inhg depth in);
+# to override only a few: $def{temp} = 'C'; $def{press} = 'mbar';
 
 $ENV{PATH} = "/usr/bin:$ENV{PATH}";
 
@@ -53,7 +55,7 @@ my %math = (
     'press|altimeter|barometer' => {
 	inhg => ['Inches of Mercury', '1,*'],
 	mmhg => ['Millimeters of Mercury', '25.4,*'],
-	mb   => ['Millibars', '33.8638815789,*'],
+	mbar => ['Millibars', '33.8638815789,*'],
 	kpa  => ['Kilopascals', '3.38638815789,*'],
 	psi  => ['Pounds per Square Inch', '.491154077497,*'],
     },
@@ -74,6 +76,13 @@ for my $re (keys %math) {
 $| = 1;
 chdir $where or die $!;
 &rrdinit();
+
+# Defaults from the config file must be set after rrdinit has created
+# the CGI object but before rrdheader has drawn the header menus.
+our $cgi;
+for my $key (keys %def) {
+    param($key) or $cgi->param($key => $def{$key});
+}
 
 if (param('footer')) {
     print header, start_html,
@@ -116,16 +125,20 @@ if (my $graph = param('graph')) {
 	       # must match %math definitions above
 	       [popup_menu(-name => 'temp', @onchange,
 			   -title => 'temperature units',
-			   -values => [qw/F C/]),
+			   -values => [qw/F C/],
+			   -default => $def{temp}),
 		popup_menu(-name => 'speed', @onchange,
 			   -title => 'wind speed units',
-			   -values => [qw/mph kph knots fps mps/]),
+			   -values => [qw/mph kph knots fps mps/],
+			   -default => $def{speed}),
 		popup_menu(-name => 'press', @onchange,
 			   -title => 'pressure units',
-			   -values => [qw/inhg mmhg mb kpa psi/]),
+			   -values => [qw/inhg mmhg mbar kpa psi/],
+			   -default => $def{press}),
 		popup_menu(-name => 'depth', @onchange,
 			   -title => 'rain depth units',
-			   -values => [qw/in cm mm/]),
+			   -values => [qw/in cm mm/],
+			   -default => $def{depth}),
 		$link ? $link : ''],
 	       undef,
 	       [checkbox(-name => 'column', @onchange,
