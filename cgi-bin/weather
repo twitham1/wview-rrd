@@ -41,7 +41,7 @@ our($width, @onchange);		# set by rrdgraphcgi.pl
 # param|regex|on|variable|names -> { unit => [ label => RRD CDEF math ] }
 # see also &rrdheader below which must match these same options
 my %math = (
-    'temp|index|chill|point' => {
+    'temp|heatindex|windchill|dewpoint' => {
 	F => [qw(Fahrenheit	1,*)],
 	C => [qw(Celsius	32,-,5,*,9,/)],
     },
@@ -53,11 +53,11 @@ my %math = (
 	mps => ['Meters per Second',	'.44704,*'],
     },
     'press|altimeter|barometer' => {
-	inhg => ['Inches of Mercury', '1,*'],
-	mmhg => ['Millimeters of Mercury', '25.4,*'],
-	mbar => ['Millibars', '33.8638815789,*'],
-	kpa  => ['Kilopascals', '3.38638815789,*'],
-	psi  => ['Pounds per Square Inch', '.491154077497,*'],
+	inhg => ['Inches of Mercury',		'1,*'],
+	mmhg => ['Millimeters of Mercury',	'25.4,*'],
+	mbar => ['Millibars',			'33.8638815789,*'],
+	kpa  => ['Kilopascals',			'3.38638815789,*'],
+	psi  => ['Pounds per Square Inch',	'.491154077497,*'],
     },
     'depth|rain' => {
 	in => [qw(Inches	1,*)],
