@@ -1,15 +1,16 @@
 
 =head1 NAME
 
-wview-rrd - Interactive RRDTool graphs for wview weather stations
+wview-rrd - Interactive RRDTool graphs for weewx/wview weather stations
 
 =head1 DESCRIPTION
 
-B<wview-rrd> updates Round Robin Database files from a local wview
-SQLite database file.  B<cgi-bin/weather> then generates interactive
-graphs of the weather data from these RRD files to a web browser.
+B<wview-rrd> updates Round Robin Database files from a local weewx or
+wview SQLite database file.  B<cgi-bin/weather> then generates
+interactive graphs of the weather data from these RRD files to a web
+browser.
 
-See B<EXAMPLES> below for an example web site.
+See B<EXAMPLES> below for a live example web site.
 
 Features of the CGI web interface include:
 
@@ -28,14 +29,15 @@ Features of the CGI web interface include:
 
 =head1 INSTALLATION
 
-Install the data collector and data presentation code:
+Install the data presentation and updater code:
 
-	cp -p or ln -s bin/* to /usr/bin/ or the location of other wv* code
+	edit cgi-bin/weather.pl config file as needed
 
-	cp -p or ln -s cgi-bin/* to your web server's cgi-bin/ directory
+	cp -p cgi-bin/* to your web server's cgi-bin/ directory
 
-	edit cgi-bin/weather.pl config file as needed - make sure
-	$where is the directory that holds your weather .sdb files.
+	cp -p bin/* to /usr/bin/
+
+	cp -p user/* /usr/share/weewx/user/ # FOR WEEWX ONLY
 
 http://localhost/cgi-bin/weather should now show an interface, but
 with broken graphs since the RRD files don't yet exist.  Click y and
@@ -50,28 +52,28 @@ the RRD files.  If you don't know, the default value is 0.
 
 Run as root, passing starting inches of rain as the only argument:
 
-	umask 022
-	cd /var/lib/wview/archive # location of wview-archive.sdb
 	wview-rrd 6.17 # where "6.17" is inches of rain to start, or 0
 
 Be patient - this first run will take a while as all your station data
 is stored in the RRD files.  Refresh the weather URL above to see the
-data coming in.  Confirm 3 RRD files are created in the current
-directory, along side the wview-archive.sdb source database file.
+data coming in.  Confirm 3 RRD files are created in the database
+directory, along side the weewx.sdb or wview-archive.sdb source file.
 After finished, run wview-rrd again and it should complete much faster
-as it just adds any new data.
+as it adds only new data.
 
-Set up automated updates of the RRD files after generating the HTML
-files.  Do this by adding a few lines to /etc/wview/post-generate.sh:
+To set up automated updates of the RRD files:
 
-	umask 022
-	cd /var/lib/wview/archive # location of wview-archive.sdb
+FOR WEEWX: append the new user service to one line of weewx.conf:
+ <	archive_services = weewx.engine.StdArchive
+ >	archive_services = weewx.engine.StdArchive, user.updaterrd.UpdateRRD
+then /etc/init.d/weewx restart 
+
+FOR WVIEW: add one line to /etc/wview/post-generate.sh:
 	wview-rrd > /tmp/wview-rrd.log 2>&1 &
 
-Add your initial YTD inches of rain as above if known.  This allows a
-simple rm *.rrd to recreate them at any time with correct initial rain
-amount.  Sometimes remove and regenerate is needed if you have edited
-data in the source database.
+RRD files should now update immediately after the database.  A simple
+rm *.rrd can recreate them at any time.  Remove and regenerate is
+needed only if you have edited data in the source database.
 
 =head1 EXAMPLES
 
@@ -79,7 +81,7 @@ http://twitham.homelinux.org/cgi-bin/weather
 
 =head1 SEE ALSO
 
-rrdtool(1), http://www.wviewweather.com/
+rrdtool(1), http://weewx.com/
 
 =head1 AUTHOR
 
@@ -87,7 +89,7 @@ Timothy D Witham <twitham@sbcglobal.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2012-2018 Timothy D Witham.
+Copyright 2012-2020 Timothy D Witham.
 
 This program is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

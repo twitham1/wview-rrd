@@ -11,7 +11,6 @@ require "$inc/rrdgraphcgi.pl";
 
 # ------------------------------------------------------------
 
-our $where = "/var/lib/wview/archive"; # path to RRD files
 our $wview	= "wview.rrd";	# main RRD file
 our $wind	= "wind.rrd";	# wind directions
 our $rain	= "rain.rrd";	# rain total
@@ -29,7 +28,16 @@ our $link	= '';		# optional header HTML, like:
 our %def = qw(temp F speed mph press inhg depth in);
 # to override only a few: $def{temp} = 'C'; $def{press} = 'mbar';
 
-$ENV{PATH} = "/usr/bin:$ENV{PATH}";
+$ENV{PATH} = "/usr/bin:$ENV{PATH}"; # for rrdtool xport XML feature
+
+# the first location with RRD files will be used
+for my $path (qw(/var/lib/weewx /home/weewx/archive
+	      /Users/Shared/weewx/archive /var/lib/wview/archive)) {
+    if (-s "$path/$wview") {
+	chdir $path or die $!;
+	last;
+    }
+}				# or $0.pl could chdir to source:
 
 # override anything above in configuation file
 -f "$0.pl" and ! -w  and require "$0.pl";
@@ -74,7 +82,6 @@ for my $re (keys %math) {
 }
 
 $| = 1;
-chdir $where or die $!;
 &rrdinit();
 
 # Defaults from the config file must be set after rrdinit has created
@@ -335,7 +342,7 @@ sub barometer {
 sub rain {
     my $label = $label{depth} || 'Inches';
     return [
-	'Rain', qw(-Y -v), $label,
+	'Rain', qw(-Y -v), "$label Year to Date",
 	&range($rain, 'totalRain', 'Rain', $primary),
 
 	"CDEF:rain=lasttotalRain,UN,PREV,lasttotalRain,IF", # U->same

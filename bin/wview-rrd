@@ -1,10 +1,9 @@
 #!/usr/bin/perl
 
-# wview-rrd: wview -> RRD data storage backend by twitham@sbcglobal.net
+# wview-rrd: weewx/wview -> RRD data storage backend by twitham@sbcglobal.net
 # see cgi-bin/weather for the CGI graphing frontend, 2013/01
 
 use strict;
-use Carp;
 use DBI;
 use RRDs;
 
@@ -14,21 +13,32 @@ if (@ARGV) {
 	? $totalrain = $ARGV[0]
 	: die "usage: $0 [N.NN] # starting rain in inches YTD\n";
 }
-my $dbfile = './wview-archive.sdb'; # input wview database
--f $dbfile or die "$0: $dbfile not found, wrong cwd?\n";
-my $dbtable = 'archive';
-my $rrdfile = 'wview.rrd';    # primary data metrics from station
-my $rainfile = 'rain.rrd';    # added to track total rain
-my $windfile = 'wind.rrd';    # added to track average wind direction
+umask 022;			# ensure readable RRD files
+
+# the first SQLite database found will be used, RRDs created/updated there
+my $dbfile = 0;
+for my $path (qw(. /var/lib/weewx /home/weewx/archive
+	      /Users/Shared/weewx/archive /var/lib/wview/archive)) {
+    for my $file (qw(weewx.sdb wview-archive.sdb)) {
+	if (-s "$path/$file") {
+	    warn "using $path/$file\n";
+	    chdir $path or die "$0: can't cd $path: $!\n";
+	    $dbfile = $file;
+	    last;
+	}
+    }
+    $dbfile and last;
+}
+$dbfile ||= 'weewx.sdb';	# default database in cwd
+my $dbtable = 'archive';	# table to use
+my $rrdfile = 'wview.rrd';	# primary data metrics from station
+my $rainfile = 'rain.rrd';	# added to track total rain
+my $windfile = 'wind.rrd';     # added to track average wind direction
 my @common = (step	=> 5 * 60, # common shared RRD options
-#	      step	=> 60,	# common shared RRD options
 	      heartbeat	=> 11 * 60,
 	      xff	=> 0.5,
 	      start	=> (scalar(time) - 10 * 365 * 24 * 60 * 60));
-#	      start	=> 1);
-my @rra	= (# join(':', 60 =>	# 1 minute details: 1 month
-	   # 	31 * 24 * 60 * 60),
-	   join(':', 5 * 60 =>	# 5 minute archives: 3 months
+my @rra	= (join(':', 5 * 60 =>	# 5 minute archives: 3 months
 		93 * 24 * 60 * 60),
 	   join(':', 60 * 60 =>	# hourly archives: 5 years
 		5 * 366 * 24 * 60 * 60),
@@ -64,7 +74,6 @@ my $wviewrrd = {
     rra => [ "$rra[0]:AVERAGE:MIN:MAX:LAST",
 	     "$rra[1]:AVERAGE:MIN:MAX:LAST",
 	     "$rra[2]:AVERAGE:MIN:MAX:LAST",
-#	     "$rra[3]:AVERAGE:MIN:MAX:LAST",
 	],
 };
 
@@ -75,7 +84,6 @@ my $windrrd = {
     rra => [ "$rra[0]:AVERAGE",
 	     "$rra[1]:AVERAGE",
 	     "$rra[2]:AVERAGE",
-#	     "$rra[3]:AVERAGE",
 	],
 };
 
@@ -109,30 +117,19 @@ my $FIELD = join ':', @FIELD;
 
 my $last = 1;			# last update time
 my $lastyear = -1;		# reset rain each year
-my $ERR;
-if (-s $rrdfile) {
+if (-s $rrdfile) {		# get last update timestamp
     $last = RRDs::last($rrdfile);
-    $ERR = RRDs::error;
-    die "ERROR while reading LAST of $rrdfile: $ERR\n" if $ERR;
+    my $err = RRDs::error;
+    die "ERROR while reading LAST of $rrdfile: $err\n" if $err;
     $lastyear = (localtime $last)[5];
 }
-if (-s $rainfile) {
-    # why oh why does this fail to see the value I stored a minute ago?
-    # ah, because it's not yet in the 5 MINUTE RRA?!  Hmmmm......
-    # my($averages) = RRDs::graph('',
-    # 				'--start' => time - 20 * 24 * 60 * 60,
-    # 				'--end' => time,
-    # 				'--step' => 1,
-    # 				"DEF:totalRain=$rainfile:totalRain:LAST",
-    # 				"VDEF:end=totalRain,LAST",
-    # 				"PRINT:end:%lf",
-    # 	);
-    # $ERR = RRDs::error;
-    # die "ERROR while reading LAST of $rainfile: $ERR\n" if $ERR;
-    # ($totalrain) = @$averages;
-#    my $tmp = RRDs::dump($rainfile); # goes to STDOUT
-    my $tmp = `rrdtool dump $rainfile | grep last_ds`;
-    $totalrain = $1 if $tmp =~ m@<last_ds>(\S+)</last_ds>@;
+if (-s $rainfile) {		# get total rain so far
+    my $tmp = RRDs::info($rainfile);
+    my $err = RRDs::error;
+    die "ERROR while reading LAST of $rainfile: $err\n" if $err;
+    $tmp = $tmp->{'ds[totalRain].last_ds'};
+    defined $tmp or die "LAST not found in $rainfile\n";
+    $totalrain = $tmp || 0;
     # print "$totalrain\n";
     # exit;
 }
@@ -215,7 +212,7 @@ sub rrdupdate {
 	    next if /.rrd$/;
 	    $parent .= "/$_";
 	    next if -d $parent;
-	    mkdir $parent or carp "can't mkdir $parent: $!\n";
+	    mkdir $parent or warn "can't mkdir $parent: $!\n";
 	}
 	my $step = $rrd->{step} || 60;
 	my $heartbeat = $rrd->{heartbeat} || $step * 3;
@@ -245,10 +242,10 @@ sub rrdupdate {
 	}
 	RRDs::create(@rrd);
 	my $err = RRDs::error;
-	croak "ERROR while creating $file: $err\n" if $err;
+	die "ERROR while creating $file: $err\n" if $err;
     }
     print "$data\n" if -t STDIN;
     RRDs::update($file, '--template' => $template, $data);
     my $err = RRDs::error;
-    carp "ERROR while updating $file: $err\n" if $err;
+    warn "ERROR while updating $file: $err\n" if $err;
 }
