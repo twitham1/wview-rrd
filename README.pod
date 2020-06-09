@@ -64,11 +64,14 @@ as it adds only new data.
 To set up automated updates of the RRD files:
 
 FOR WEEWX: append the new user service to one line of weewx.conf:
+
  <	archive_services = weewx.engine.StdArchive
  >	archive_services = weewx.engine.StdArchive, user.updaterrd.UpdateRRD
+
 then /etc/init.d/weewx restart 
 
 FOR WVIEW: add one line to /etc/wview/post-generate.sh:
+
 	wview-rrd > /tmp/wview-rrd.log 2>&1 &
 
 RRD files should now update immediately after the database.  A simple
