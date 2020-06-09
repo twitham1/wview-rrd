@@ -14,6 +14,7 @@ if (@ARGV) {
 	: die "usage: $0 [N.NN] # starting rain in inches YTD\n";
 }
 umask 022;			# ensure readable RRD files
+my $tty = -t STDIN;		# clues when interactive
 
 # the first SQLite database found will be used, RRDs created/updated there
 my $dbfile = 0;
@@ -21,7 +22,7 @@ for my $path (qw(. /var/lib/weewx /home/weewx/archive
 	      /Users/Shared/weewx/archive /var/lib/wview/archive)) {
     for my $file (qw(weewx.sdb wview-archive.sdb)) {
 	if (-s "$path/$file") {
-	    warn "using $path/$file\n";
+	    warn "using $path/$file\n" if $tty;
 	    chdir $path or die "$0: can't cd $path: $!\n";
 	    $dbfile = $file;
 	    last;
@@ -244,7 +245,7 @@ sub rrdupdate {
 	my $err = RRDs::error;
 	die "ERROR while creating $file: $err\n" if $err;
     }
-    print "$data\n" if -t STDIN;
+    print "$file: $data\n" if $tty;
     RRDs::update($file, '--template' => $template, $data);
     my $err = RRDs::error;
     warn "ERROR while updating $file: $err\n" if $err;
