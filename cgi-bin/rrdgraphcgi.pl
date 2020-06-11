@@ -90,15 +90,16 @@ sub rrdgraph {
     if ($xport eq 'rrd') {	# reveal the actual rrd command
 	print join "\n", "rrdtool graph", @graph;
 
-    } elsif ($xport) {			       # export data
-	grep s/\#\w+//, @graph;		       # remove colors
-	grep s/:?:(STACK|dash).*//, @graph;      # remove options
-	grep s/^(AREA|LINE\d+|STACK)/XPORT/, @graph; # XPORT all graphic vars
-	grep s/^(XPORT:)(\w+):*(.*)$/"$1$2:" . ($3 ? "$2=$3" : $2)/e, @graph; # default legend = var
+    } elsif ($xport) {          # convert graph to data XPORT
+	grep s/\#\w+//, @graph; # remove colors
+	grep s/:(STACK|dash).*//, @graph; # remove options (leave legend)
+	grep s/^(AREA|LINE\d+|STACK)/XPORT/, @graph; # XPORT graphed vars
+	grep s/^(XPORT:)(\w+):*(.*)$/"$1$2:" . ($3 ? "$2=$3" : $2)/e, @graph;
 	@graph = grep m/^([CV]?DEF|XPORT)/, @graph; # strip unknowns
-	@graph = (-s	=> $start,
-		  -e	=> $end,
-		  -m	=> $width,
+	@graph = (-s    => $start,
+		  -e    => $end,
+		  -m    => $width,
+		  '--step' => $step, # fixes bug #7
 		  @graph);
 	if ($xport =~ 'xml|json') {
 	    $xport =~ /json/ and unshift @graph, '--json'; # not on SLES10
@@ -198,6 +199,9 @@ Calendar.setup({
 </script>
 ';
     my $css = '
+table, tr, td {
+  vertical-align: top
+}
 .img_view {
   float: left;
   margin: 0;
