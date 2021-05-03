@@ -42,6 +42,9 @@ sub rrdinit {
 
     our @onchange = param('manual') ? ()
 	: (-onchange => 'this.form.submit()');
+
+    # additional timeframes to show upon "click for options":
+    our @TIME = ($HOUR,6*$HOUR, $DAY, $WEEK, $MONTH, $QUARTER, $YEAR,4*$YEAR);
 }
 
 sub pn { p . "\n" }
@@ -321,35 +324,36 @@ table, tr, td {
 }
 
 sub rrdgraphtime {
-    my($i) = @_;		# times should be configurable, but:
-    my @time = ($HOUR,6*$HOUR, $DAY, $WEEK, $MONTH, $QUARTER, $YEAR,4*$YEAR);
-    for my $time ($end - $start, @time) {
+    my($i) = @_;
+    for my $time ($end - $start, @TIME) {
 	my $start = $end - $time;
 	my $span = &secformat($end - $start);
 	my @opts = (graph => $i, start => $start);
-	print qq'<div class="img_view">$span - zoom: ',
-	&link('3x', { @opts,
-		      width => $width * 3,
-		      height => $height * 3 }), ' | ',
-	&link('4x', { @opts,
-		      width => $width * 4,
-		      height => $height * 4 }), ' | export: ',
-	&link('csv',  { @opts, xport => 'csv' }), ' | ',
-	&link('xml',  { @opts, xport => 'xml' }), ' | ',
-	&link('json', { @opts, xport => 'json' }), ' | ',
-	&link('rrd',  { @opts, xport => 'rrd' }),
-	brn,
-	&link(img({-src => &link(0, { graph => $i,
-				      start => $start }),
-		   -alt => "Graph $i",
-		   -valign => "top",
-		   -title => "Click to Zoom",
-		   -border => 0 }),
-	      { graph => $i,
-		start => $start,
-		width => $width * 2,
-		height => $height * 2 }),
-	"</div>\n";
+	print qq'<div class="img_view">',
+	    &link($span, { start => $start, end => $end },
+		  "all graphs at $span"), qq' - zoom: ',
+	    &link('3x', { @opts,
+			      width => $width * 3,
+			      height => $height * 3 }), ' | ',
+	    &link('4x', { @opts,
+			      width => $width * 4,
+			      height => $height * 4 }), ' | export: ',
+	    &link('csv',  { @opts, xport => 'csv' }), ' | ',
+	    &link('xml',  { @opts, xport => 'xml' }), ' | ',
+	    &link('json', { @opts, xport => 'json' }), ' | ',
+	    &link('rrd',  { @opts, xport => 'rrd' }),
+	    brn,
+	    &link(img({-src => &link(0, { graph => $i,
+					  start => $start }),
+			   -alt => "Graph $i",
+			   -valign => "top",
+			   -title => "Click to Zoom",
+			   -border => 0 }),
+		  { graph => $i,
+		    start => $start,
+		    width => $width * 2,
+		    height => $height * 2 }),
+	    "</div>\n";
     }
 }
 

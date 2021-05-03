@@ -23,6 +23,7 @@ our $name1	= 'Extra1';	# one-word name for:
 our $color1	= '000000';	#   extra sensor 1
 our $name2	= 'Extra2';	# one-word name for:
 our $color2	= '888888';	#   extra sensor 2
+our $install	= 0;		# station install time in seconds
 our $link	= '';		# optional header HTML, like:
 # $link = ' See also: '. a({-href => '/weather/'}, 'wview page');
 our %def = qw(temp F speed mph press inhg depth in);
@@ -83,6 +84,8 @@ for my $re (keys %math) {
 
 $| = 1;
 &rrdinit();
+our(@TIME, $YEAR, $end);	# configs in rrdgraphcgi.pl
+$install and push @TIME, ($end - $install); # station startup time in seconds
 
 # Defaults from the config file must be set after rrdinit has created
 # the CGI object but before rrdheader has drawn the header menus.
