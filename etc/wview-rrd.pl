@@ -15,30 +15,30 @@ our %extra = (
     extraHumid4	=> "GAUGE:0:100",
     );
 
-# uncomment optional status variables that you have:
+# uncomment optional status variables that you have in your .sdb:
 our %status = (
 
     # in default wview schema:
     windBatteryStatus	=> "GAUGE:0:1",
     rainBatteryStatus	=> "GAUGE:0:1",
-#    uvBatteryStatus	=> "GAUGE:0:1",
     outTempBatteryStatus => "GAUGE:0:1",
+#    uvBatteryStatus	=> "GAUGE:0:1",
 
     # only in extended TE923 schema:
-    extraBatteryStatus1	=> "GAUGE:0:1",
-    extraBatteryStatus2	=> "GAUGE:0:1",
-    extraBatteryStatus3	=> "GAUGE:0:1",
-    extraBatteryStatus4	=> "GAUGE:0:1",
     windLinkStatus	=> "GAUGE:0:1",
     rainLinkStatus	=> "GAUGE:0:1",
-#    uvLinkStatus	=> "GAUGE:0:1",
     outLinkStatus	=> "GAUGE:0:1",
+#    uvLinkStatus	=> "GAUGE:0:1",
     extraLinkStatus1	=> "GAUGE:0:1",
     extraLinkStatus2	=> "GAUGE:0:1",
     extraLinkStatus3	=> "GAUGE:0:1",
     extraLinkStatus4	=> "GAUGE:0:1",
-    forecast	=> "GAUGE:0:7",
-    storm	=> "GAUGE:0:1",
+    extraBatteryStatus1	=> "GAUGE:0:1",
+    extraBatteryStatus2	=> "GAUGE:0:1",
+    extraBatteryStatus3	=> "GAUGE:0:1",
+    extraBatteryStatus4	=> "GAUGE:0:1",
+    forecast	=> "GAUGE:0:7",	# 0-6 for TE923, YMMV
+    storm	=> "GAUGE:0:1",	# 0-1 for TE923, YMMV
     );
 
 1;				# this file must return true

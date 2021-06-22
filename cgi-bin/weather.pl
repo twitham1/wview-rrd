@@ -6,9 +6,6 @@
 # our $primary = 'FF00FF';
 # our $title = 'Weather at my house';
 
-our $name1 = 'Garage';		# extra sensor 1
-our $name2 = 'Attic';		# extra sensor 2
-
 our $link = ' See also: '. a({-href => '/weather/'}, 'weewx');
 # $link .= ', '
 #     . a({-href => 'https://wunderground.com/dashboard/pws/KTXAUSTI1217'},
@@ -21,7 +18,9 @@ our $link = ' See also: '. a({-href => '/weather/'}, 'weewx');
 # # or to override only one at a time:
 # $def{press} = 'kpa';
 
-our $extra = { # optional sensors, uncomment if you have data in .sdb file:
+# Optional sensors with names and colors.  Uncomment only if you have
+# data in .sdb file.  See also /etc/wview-rrd.pl
+our $extra = {
 
     # UV => [ UV => $primary ],	# uncomment if you have Ultra Violet data
 

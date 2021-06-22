@@ -101,7 +101,7 @@ for my $key (keys %def) {
 if (param('footer')) {
     print header, start_html,
     "<table><tr valign=top><td>\n";
-    for my $file ($wview, $wind, $rain) {
+    for my $file ($wview, $wind, $rain, $status) {
 	print "<td>";
 	&rrdfooter($file) if -f $file;
 	print "\n";
@@ -109,6 +109,13 @@ if (param('footer')) {
     print "</tr></table>\n";
     print end_html;
     exit;
+}
+
+my @status = grep /Status/, sort keys %status;
+my $i = @status * 2 - 1;
+for (@status) {		      # plot each boolean on separate odd/even
+    $math{substr($_, 0, 19)} = "$i,+";
+    $i -= 2;
 }
 
 my $tr = param('column') ? "<tr><td>" : "";
@@ -131,6 +138,8 @@ push @$rrd, $tr, &uv
     if $extra->{UV};
 push @$rrd, $tr, &forecast
     if $status{forecast} or $status{storm};
+push @$rrd, $tr, &status
+    if @status and param('status');
 
 if (my $graph = param('graph')) {
 
@@ -169,6 +178,10 @@ if (my $graph = param('graph')) {
 				   -title => "add $extra->{$_}[0] sensor") }
 		    sort grep { /Temp/ } keys %$extra)
 		 : ()),
+		(@status
+		 ? checkbox(-name => 'status', @onchange,
+			    -title => 'add sensor status graph')
+		 : ())
 	       ]);
 
     if (my $g = param('graphtime')) {
@@ -178,7 +191,7 @@ if (my $graph = param('graph')) {
     }
 
     print qq'<hr class="footer">\ngenerated from ',
-    &link("3 rrd files", { footer => 1}, 'RRD Info'),
+    &link("RRD files", { footer => 1}, 'RRD Info'),
     ", last modified ", scalar(localtime((stat $wview)[9])),
     " by ", a({-href => 'https://github.com/twitham1/wview-rrd'},
 	      'wview-rrd'), "\n";
@@ -396,18 +409,34 @@ sub forecast {	# legend is for TE923, YMMV, should be configurable...
 	];
 }
 
+sub status {
+    my $i = 0;
+    return [
+	'Status', qw(-Y -v), 'Station Sensor Status',
+	(map {
+	    &range($status, $_, sprintf('%-20s', $_),
+		   /Battery/ ? $primary : $secondary),
+	 } @status),
+	"COMMENT:  odd == OK, even == BAD",
+	];
+}
+
 BEGIN {
     my $offset = 0;			# dash-offset
 # return RRD code to plot range of given $var from $file in $color
 sub range {
     my($file, $var, $label, $color, $alpha, $more) = @_;
     $label = $var unless $label;
+    $var = substr($var, 0, 19);	# see rrdcreate(1)
     $color = '000000' unless $color;
     $alpha = '88' unless $alpha;
     $offset += 3; $offset = 0 if $offset > 12;
     my $math = '1,*';
     for my $re (keys %math) {
-	if ($var =~ /$re/i) {
+	if ($var eq $re) {	# status shift
+	    $math = $math{$var};
+	    last;
+	} elsif ($var =~ /$re/i) { # unit change
 	    (my $key = $re) =~ s/\|.*//;
 	    my $this = $math{$re}{param($key)};
 	    $this and $math = $this->[1];
