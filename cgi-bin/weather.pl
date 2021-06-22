@@ -21,4 +21,20 @@ our $link = ' See also: '. a({-href => '/weather/'}, 'weewx');
 # # or to override only one at a time:
 # $def{press} = 'kpa';
 
+our $extra = { # optional sensors, uncomment if you have data in .sdb file:
+
+    # UV => [ UV => $primary ],	# uncomment if you have Ultra Violet data
+
+    extraTemp1 => [ qw/Garage   000000/ ],
+    extraTemp2 => [ qw/Attic    888888/ ],
+    extraTemp3 => [ qw/BedRoom  00FF00/ ],
+    extraTemp4 => [ qw/Porch    FF00FF/ ],
+
+    extraHumid1 => [ qw/Garage   000000/ ],
+    extraHumid2 => [ qw/Attic    888888/ ],
+    extraHumid3 => [ qw/BedRoom  00FF00/ ],
+    extraHumid4 => [ qw/Porch    FF00FF/ ],
+
+};
+
 1;				# this file must return true
