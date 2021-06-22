@@ -14,7 +14,8 @@ require "$inc/rrdgraphcgi.pl";
 our $wview	= "wview.rrd";	# main RRD file
 our $wind	= "wind.rrd";	# wind directions
 our $rain	= "rain.rrd";	# rain total
-our $title	= 'Wview Weather'; # title for the page
+our $status	= "status.rrd";	# status file
+our $title	= 'Weewx Weather'; # title for the page
 our $primary	= 'FF0000';	# primary metric color
 our $secondary	= '0000FF';	# secondary metric color
 our $third	= '008800';	# third metric color
@@ -128,6 +129,8 @@ push @$rrd, $tr, &rain;
 push @$rrd, $tr, &rainrate;
 push @$rrd, $tr, &uv
     if $extra->{UV};
+push @$rrd, $tr, &forecast
+    if $status{forecast} or $status{storm};
 
 if (my $graph = param('graph')) {
 
@@ -371,6 +374,25 @@ sub uv {
     return [
 	'Ultra Violet', qw(-Y -v), 'Ultra Violet Index',
 	&range($wview, 'UV', 'Ultra Violet', $primary),
+	];
+}
+
+sub forecast {	# legend is for TE923, YMMV, should be configurable...
+    my $i = -1;
+    return [
+	'Forecast', qw(-Y -v), 'Forecast / Storm',
+	($status{forecast}
+	 ? &range($status, 'forecast', 'Forecast', $primary) : ()),
+	($status{storm} 
+	 ? &range($status, 'storm',    'Storm   ', $secondary) : ()),
+	map { $i++; "COMMENT:$i $_" } ( # from weewx/te923.py
+	    'heavy snow',
+	    'light snow',
+	    'heavy rain',
+	    'light rain',
+	    'heavy clouds',
+	    'light clouds',
+	    'sunny'),
 	];
 }
 
