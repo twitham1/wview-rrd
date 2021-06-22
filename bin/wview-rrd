@@ -7,12 +7,20 @@ use strict;
 use DBI;
 use RRDs;
 
-my $totalrain = 0;    # must match YTD starting rain in first run only
+our $totalrain = 0;    # must match YTD starting rain in first run only
 if (@ARGV) {
     $ARGV[0] =~ /^\d+(\.\d+)?$/
 	? $totalrain = $ARGV[0]
 	: die "usage: $0 [N.NN] # starting rain in inches YTD\n";
 }
+
+our %extra;		 # extra variables to track, from config file
+our %status;		 # status variables to track, from config file
+my $file = '/etc/wview-rrd.pl';
+if (-f $file and -s $file) {
+    require $file;
+}
+
 umask 022;			# ensure readable RRD files
 my $tty = -t STDIN;		# clues when interactive
 
@@ -30,15 +38,19 @@ for my $path (qw(. /var/lib/weewx /home/weewx/archive
     }
     $dbfile and last;
 }
+
+chdir 'tmp' if $tty;		# dev hack, remove this!!!
+
 $dbfile ||= 'weewx.sdb';	# default database in cwd
 my $dbtable = 'archive';	# table to use
 my $rrdfile = 'wview.rrd';	# primary data metrics from station
 my $rainfile = 'rain.rrd';	# added to track total rain
 my $windfile = 'wind.rrd';     # added to track average wind direction
+my $statfile = 'status.rrd';   # added to track station status
 my @common = (step	=> 5 * 60, # common shared RRD options
 	      heartbeat	=> 11 * 60,
 	      xff	=> 0.5,
-	      start	=> (scalar(time) - 10 * 365 * 24 * 60 * 60));
+	      start	=> (time - 30 * 365 * 24 * 60 * 60));
 my @rra	= (join(':', 5 * 60 =>	# 5 minute archives: 3 months
 		93 * 24 * 60 * 60),
 	   join(':', 60 * 60 =>	# hourly archives: 5 years
@@ -46,6 +58,14 @@ my @rra	= (join(':', 5 * 60 =>	# 5 minute archives: 3 months
 	   join(':', 24 * 60 * 60 => # daily archives: 50 years
 		50 * 366 * 24 * 60 * 60),
     );
+
+my $statrrd = {			# only keep first RRA for status as
+    @common,			# its not interesting in longer term
+	ds => { %status },	# status from config file
+	rra => [
+	    "$rra[0]:AVERAGE:MIN:MAX:LAST",
+	],
+};
 
 my $wviewrrd = {
     @common,
@@ -66,11 +86,7 @@ my $wviewrrd = {
 	dewpoint	=> "GAUGE:-100:200",
 	windchill	=> "GAUGE:-100:200",
 	heatindex	=> "GAUGE:-50:250",
-	UV		=> "GAUGE:0:36",
-	extraTemp1	=> "GAUGE:-50:200",
-	extraTemp2	=> "GAUGE:-50:200",
-	extraHumid1	=> "GAUGE:0:100",
-	extraHumid2	=> "GAUGE:0:100",
+	%extra,			# extras from config file
     },
     rra => [ "$rra[0]:AVERAGE:MIN:MAX:LAST",
 	     "$rra[1]:AVERAGE:MIN:MAX:LAST",
@@ -88,33 +104,11 @@ my $windrrd = {
 	],
 };
 
-# fields to store, in order
-my @FIELD = qw(
-barometer
-pressure
-altimeter
-inTemp
-outTemp
-inHumidity
-outHumidity
-windSpeed
-windDir
-windGust
-windGustDir
-rainRate
-rain
-dewpoint
-windchill
-heatindex
-UV
-extraTemp1
-extraTemp2
-extraHumid1
-extraHumid2
-);
-# TODO: let UV and later be optional/configurable
-
+my @FIELD = sort keys %{$wviewrrd->{ds}}; # fields to store
 my $FIELD = join ':', @FIELD;
+
+my @STAT = sort keys %status;	# status from config file
+my $STAT = join ':', @STAT;
 
 my $last = 1;			# last update time
 my $lastyear = -1;		# reset rain each year
@@ -157,8 +151,11 @@ sub catchup {
 	&rrdupdate($rrdfile, $FIELD,
 		   (join ':', $row->{dateTime},
 		    map { &rrdvalue($row->{$_}) } @FIELD),
-
 		   $wviewrrd);
+	&rrdupdate($statfile, $STAT,
+		   (join ':', $row->{dateTime},
+		    map { &rrdvalue($row->{$_}) } @STAT),
+		   $statrrd);
 
 	my $year = (localtime $row->{dateTime})[5];
 	if ($year != $lastyear) {
@@ -169,7 +166,6 @@ sub catchup {
 	&rrdupdate($rainfile, 'totalRain',
 		   (join ':', $row->{dateTime}, $totalrain),
 		   $rainrrd);
-
 	&wind($row->{dateTime},
 	      &rrdvalue($row->{windDir}),
 	      &rrdvalue($row->{windGustDir}));
@@ -202,9 +198,12 @@ sub wind {
     	       $windrrd);
 }
 
+{ my $n = 0;
 # update an RRD file, creating it if needed
 sub rrdupdate {
     my($file, $template, $data, $rrd) = @_;
+
+    $template =~ s/\b(\w{19})\w+\b/$1/g; # see rrdcreate(1)
 
     unless (-s $file) {
 	my @path = split '/', $file;
@@ -241,12 +240,18 @@ sub rrdupdate {
 		push @rrd, "RRA:$cf:$xff:$steps:$rows";
 	    }
 	}
+	warn "@rrd\n";
 	RRDs::create(@rrd);
 	my $err = RRDs::error;
 	die "ERROR while creating $file: $err\n" if $err;
     }
-    print "$file: $data\n" if $tty;
+    if ($tty and !(++$n % 10000)) {
+	my($t) = ($data =~ /^(\d+)/);
+	$t and $t = localtime $t;
+	print STDERR "$t\t$n\t$file\r";
+    }
     RRDs::update($file, '--template' => $template, $data);
     my $err = RRDs::error;
     warn "ERROR while updating $file: $err\n" if $err;
+}
 }

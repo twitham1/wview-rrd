@@ -31,6 +31,8 @@ Features of the CGI web interface include:
 
 Install the data presentation and updater code:
 
+	cp etc/wview-rrd.pl to /etc and edit as needed
+
 	edit cgi-bin/weather.pl config file as needed
 
 	cp -p cgi-bin/* to your web server's cgi-bin/ directory
@@ -92,7 +94,7 @@ Timothy D Witham <twitham@sbcglobal.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2012-2020 Timothy D Witham.
+Copyright 2012-2021 Timothy D Witham.
 
 This program is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
