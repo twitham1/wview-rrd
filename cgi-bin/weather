@@ -401,7 +401,7 @@ sub uv {
 sub forecast {	# legend is for TE923, YMMV, should be configurable...
     my $i = -1;
     return [
-	'Forecast', qw(-Y -v), 'Forecast / Storm',
+	'Forecast', qw(-l 0 -Y -v), 'Forecast / Storm',
 	($status{forecast}
 	 ? &range($status, 'forecast', 'Forecast', $primary) : ()),
 	($status{storm} 
@@ -418,8 +418,15 @@ sub forecast {	# legend is for TE923, YMMV, should be configurable...
 }
 
 sub status {			# sensor status boolean lines
-    my %name;			# more friendly names, if configured
-    my $tmp;
+    my %name = (
+	outTempBatteryStatus	=> 'Outdoor Battery',
+	outLinkStatus		=> 'Outdoor Link',
+	rainBatteryStatus	=> 'Rain Battery',
+	rainLinkStatus		=> 'Rain Link',
+	windBatteryStatus	=> 'Wind Battery',
+	windLinkStatus		=> 'Wind Link',
+	);
+    my $tmp;		  # get extra sensor labels from configuration
     map { $tmp = $_
 	      and $tmp =~ s/(Battery|Link)Status/Temp/
 	      and $extra->{$tmp}
