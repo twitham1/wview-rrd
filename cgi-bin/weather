@@ -111,7 +111,15 @@ if (param('footer')) {
     exit;
 }
 
-my @status = grep /Status/, sort keys %status;
+sub bysensor {		       # sort battery/link together per sensor
+    my($A, $B) = ($a, $b);
+    $A =~ s/outTemp/out/;
+    $B =~ s/outTemp/out/;
+    $A =~ s/(.*)(Battery|Link)(.*)/$1$3$2/;
+    $B =~ s/(.*)(Battery|Link)(.*)/$1$3$2/;
+    return $A cmp $B || $a cmp $b;
+}
+my @status = grep /Status/, sort bysensor keys %status;
 my $i = @status * 2 - 1;
 for (@status) {		      # plot each boolean on separate odd/even
     $math{substr($_, 0, 19)} = "$i,+";
@@ -409,15 +417,22 @@ sub forecast {	# legend is for TE923, YMMV, should be configurable...
 	];
 }
 
-sub status {
-    my $i = 0;
+sub status {			# sensor status boolean lines
+    my %name;			# more friendly names, if configured
+    my $tmp;
+    map { $tmp = $_
+	      and $tmp =~ s/(Battery|Link)Status/Temp/
+	      and $extra->{$tmp}
+	  and $name{$_} = $extra->{$tmp}[0] . " $1"
+    } @status;
     return [
 	'Status', qw(-Y -v), 'Station Sensor Status',
 	(map {
-	    &range($status, $_, sprintf('%-20s', $_),
+	    &range($status, $_, sprintf('%-20s', $name{$_} || $_),
 		   /Battery/ ? $primary : $secondary),
 	 } @status),
-	"COMMENT:  odd == OK, even == BAD",
+	"COMMENT:  odd == OK, even == BAD  "
+	. "   < middle fraction < == percent BAD  ",
 	];
 }
 
