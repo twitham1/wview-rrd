@@ -406,7 +406,7 @@ sub forecast {	# legend is for TE923, YMMV, should be configurable...
 	 ? &range($status, 'forecast', 'Forecast', $primary) : ()),
 	($status{storm} 
 	 ? &range($status, 'storm',    'Storm   ', $secondary) : ()),
-	map { $i++; "COMMENT:$i $_" } ( # from weewx/te923.py
+	map { $i++; "COMMENT:$i = $_" } ( # from weewx/te923.py
 	    'heavy snow',
 	    'light snow',
 	    'heavy rain',
@@ -426,7 +426,7 @@ sub status {			# sensor status boolean lines
 	  and $name{$_} = $extra->{$tmp}[0] . " $1"
     } @status;
     return [
-	'Status', qw(-Y -v), 'Station Sensor Status',
+	'Status', qw(-l 0 -Y -v), 'Station Sensor Status',
 	(map {
 	    &range($status, $_, sprintf('%-20s', $name{$_} || $_),
 		   /Battery/ ? $primary : $secondary),
