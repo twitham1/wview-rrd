@@ -438,8 +438,8 @@ sub status {			# sensor status boolean lines
 	    &range($status, $_, sprintf('%-20s', $name{$_} || $_),
 		   /Battery/ ? $primary : $secondary),
 	 } @status),
-	"COMMENT:  odd == OK, even == BAD  "
-	. "   < middle fraction < == percent BAD  ",
+	"COMMENT: odd == OK, even == BAD "
+	. "( < average .fraction == percent BAD < )",
 	];
 }
 
