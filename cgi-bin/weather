@@ -454,15 +454,16 @@ sub range {
     $alpha = '88' unless $alpha;
     $offset += 3; $offset = 0 if $offset > 12;
     my $math = '1,*';
-    for my $re (keys %math) {
-	if ($var eq $re) {	# status shift
-	    $math = $math{$var};
-	    last;
-	} elsif ($var =~ /$re/i) { # unit change
-	    (my $key = $re) =~ s/\|.*//;
-	    my $this = $math{$re}{param($key)};
-	    $this and $math = $this->[1];
-	    last;
+    if ($math{$var}) {		# boolean status offset
+	$math = $math{$var};
+    } else {			# look for requested units
+	for my $re (keys %math) {
+	    if ($var =~ /$re/i) {
+		(my $key = $re) =~ s/\|.*//;
+		my $this = $math{$re}{param($key)};
+		$this and $math = $this->[1];
+		last;
+	    }
 	}
     }
     return (
