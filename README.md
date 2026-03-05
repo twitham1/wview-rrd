@@ -1,1 +1,97 @@
-README.pod
+# NAME
+
+wview-rrd - Interactive RRDTool graphs for weewx/wview weather stations
+
+# DESCRIPTION
+
+**wview-rrd** updates Round Robin Database files from a local weewx or
+wview SQLite database file.  **cgi-bin/weather** then generates
+interactive graphs of the weather data from these RRD files to a web
+browser.
+
+Features of the CGI web interface include:
+
+    * show all weather variables in high resolution time series graphs
+    * change displayed units, with configurable defaults
+    * zoom the displayed time frame: year, month, week, day, hour, custom
+    * scroll the displayed time frame of the graphs left/right
+    * change graph plot size (width x height)
+    * change data resolution - detailed, hourly, daily and so on
+    * at wider resolutions, show average line in min/max area
+    * add graphs of extra sensor data
+    * show (min < avg < max) last, of plotted data in the legend
+    * show many times of a graph at once (just click a graph)
+    * export the data of any graph to csv, xml, json or see RRD code
+    * all widgets / links have mouse balloon tooltip clues
+
+# INSTALLATION
+
+Install the data presentation and updater code:
+
+        cp etc/wview-rrd.pl to /etc and edit as needed
+
+        edit cgi-bin/weather.pl config file as needed
+
+        cp -p cgi-bin/* to your web server's cgi-bin/ directory
+
+        cp -p bin/* to /usr/bin/
+
+        cp -p user/* /usr/share/weewx/user/ # FOR WEEWX ONLY
+
+http://localhost/cgi-bin/weather should now show an interface, but
+with broken graphs since the RRD files don't yet exist.  Click y and
+<< a couple times to zoom out to a 4 year view.  You can refresh this
+in a moment to see the data coming in as you run the data collector.
+
+These graphs track accumulated rain per year, automatically resetting
+to 0 at the beginning of each year.  So, you can optionally find out
+how many inches of rain you had in the year up to the start date of
+your station.  This needs passed to wview-rrd when it first generates
+the RRD files.  If you don't know, the default value is 0.
+
+Run as root, passing starting inches of rain as the only argument:
+
+        wview-rrd 6.17 # where "6.17" is inches of rain to start, or 0
+
+Be patient - this first run will take a while as all your station data
+is stored in the RRD files.  Refresh the weather URL above to see the
+data coming in.  Confirm 3 RRD files are created in the database
+directory, along side the weewx.sdb or wview-archive.sdb source file.
+After finished, run wview-rrd again and it should complete much faster
+as it adds only new data.
+
+To set up automated updates of the RRD files:
+
+FOR WEEWX: append the new user service to one line of weewx.conf:
+
+    <      archive_services = weewx.engine.StdArchive
+    >      archive_services = weewx.engine.StdArchive, user.updaterrd.UpdateRRD
+
+then /etc/init.d/weewx restart 
+
+FOR WVIEW: add one line to /etc/wview/post-generate.sh:
+
+        wview-rrd > /tmp/wview-rrd.log 2>&1 &
+
+RRD files should now update immediately after the database.  A simple
+rm \*.rrd can recreate them at any time.  Remove and regenerate is
+needed only if you have edited data in the source database.
+
+# EXAMPLES
+
+![weather example](etc/weather.png)
+
+# SEE ALSO
+
+rrdtool(1), http://weewx.com/
+
+# AUTHOR
+
+Timothy D Witham <twitham@sbcglobal.net>
+
+# COPYRIGHT AND LICENSE
+
+Copyright 2012-2021 Timothy D Witham.
+
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
