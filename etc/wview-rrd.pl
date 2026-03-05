@@ -2,6 +2,11 @@
 
 # configure optional data for wview-rrd, by twitham@sbcglobal.net
 
+# examples given here are for TE923W hardware
+
+# seconds after which RRD data goes UNKNOWN (default = 11 minutes)
+$heartbeat =  61 * 60;	# TE923W logger holds one data point per hour
+
 # uncomment optional station variables that you have in your .sdb:
 our %extra = (
 #    UV		=> "GAUGE:0:36",

@@ -16,6 +16,7 @@ if (@ARGV) {
 
 our %extra;		 # extra variables to track, from config file
 our %status;		 # status variables to track, from config file
+our $heartbeat = 11 * 60;	# when data goes UNKNOWN
 my $file = '/etc/wview-rrd.pl';
 if (-f $file and -s $file) {
     require $file;
@@ -48,7 +49,7 @@ my $rainfile = 'rain.rrd';	# added to track total rain
 my $windfile = 'wind.rrd';     # added to track average wind direction
 my $statfile = 'status.rrd';   # added to track station status
 my @common = (step	=> 5 * 60, # common shared RRD options
-	      heartbeat	=> 11 * 60,
+	      heartbeat	=> $heartbeat,
 	      xff	=> 0.5,
 	      start	=> (time - 30 * 365 * 24 * 60 * 60));
 my @rra	= (join(':', 5 * 60 =>	# 5 minute archives: 3 months
@@ -155,7 +156,8 @@ sub catchup {
 	&rrdupdate($statfile, $STAT,
 		   (join ':', $row->{dateTime},
 		    map { &rrdvalue($row->{$_}) } @STAT),
-		   $statrrd);
+		   $statrrd)
+	    if @STAT;
 
 	my $year = (localtime $row->{dateTime})[5];
 	if ($year != $lastyear) {

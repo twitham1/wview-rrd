@@ -10,8 +10,6 @@ wview SQLite database file.  B<cgi-bin/weather> then generates
 interactive graphs of the weather data from these RRD files to a web
 browser.
 
-See B<EXAMPLES> below for a live example web site.
-
 Features of the CGI web interface include:
 
   * show all weather variables in high resolution time series graphs
@@ -82,7 +80,7 @@ needed only if you have edited data in the source database.
 
 =head1 EXAMPLES
 
-http://twitham.homelinux.org/cgi-bin/weather
+![weather example](etc/weather.png)
 
 =head1 SEE ALSO
 
