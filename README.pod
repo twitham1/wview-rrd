@@ -37,7 +37,8 @@ Install the data presentation and updater code:
 
 	cp -p bin/* to /usr/bin/
 
-	cp -p user/* /usr/share/weewx/user/ # FOR WEEWX ONLY
+	cp -p user/* /etc/weewx/bin/user/   # FOR WEEWX ONLY, NEW versions
+	cp -p user/* /usr/share/weewx/user/ # FOR WEEWX ONLY, old versions
 
 http://localhost/cgi-bin/weather should now show an interface, but
 with broken graphs since the RRD files don't yet exist.  Click y and
@@ -80,7 +81,12 @@ needed only if you have edited data in the source database.
 
 =head1 EXAMPLES
 
-![weather example](etc/weather.png)
+The screenshot in the source etc/weather.png shows the control header
+and four graphs.  The legends show "(min < avg < max) last" of the
+metrics for the displayed time.  The wind graph shows a wind change
+from south to north in the color below 0.
+
+(etc/weather.png)
 
 =head1 SEE ALSO
 
@@ -92,7 +98,7 @@ Timothy D Witham <twitham@sbcglobal.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2012-2021 Timothy D Witham.
+Copyright 2012-2026 Timothy D Witham.
 
 This program is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

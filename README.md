@@ -11,18 +11,18 @@ browser.
 
 Features of the CGI web interface include:
 
-    * show all weather variables in high resolution time series graphs
-    * change displayed units, with configurable defaults
-    * zoom the displayed time frame: year, month, week, day, hour, custom
-    * scroll the displayed time frame of the graphs left/right
-    * change graph plot size (width x height)
-    * change data resolution - detailed, hourly, daily and so on
-    * at wider resolutions, show average line in min/max area
-    * add graphs of extra sensor data
-    * show (min < avg < max) last, of plotted data in the legend
-    * show many times of a graph at once (just click a graph)
-    * export the data of any graph to csv, xml, json or see RRD code
-    * all widgets / links have mouse balloon tooltip clues
+* show all weather variables in high resolution time series graphs
+* change displayed units, with configurable defaults
+* zoom the displayed time frame: year, month, week, day, hour, custom
+* scroll the displayed time frame of the graphs left/right
+* change graph plot size (width x height)
+* change data resolution - detailed, hourly, daily and so on
+* at wider resolutions, show average line in min/max area
+* add graphs of extra sensor data
+* show (min < avg < max) last, of plotted data in the legend
+* show many times of a graph at once (just click a graph)
+* export the data of any graph to csv, xml, json or see RRD code
+* all widgets / links have mouse balloon tooltip clues
 
 # INSTALLATION
 
@@ -36,7 +36,8 @@ Install the data presentation and updater code:
 
         cp -p bin/* to /usr/bin/
 
-        cp -p user/* /usr/share/weewx/user/ # FOR WEEWX ONLY
+        cp -p user/* /etc/weewx/bin/user/   # FOR WEEWX ONLY, NEW versions
+        cp -p user/* /usr/share/weewx/user/ # FOR WEEWX ONLY, old versions
 
 http://localhost/cgi-bin/weather should now show an interface, but
 with broken graphs since the RRD files don't yet exist.  Click y and
@@ -79,7 +80,12 @@ needed only if you have edited data in the source database.
 
 # EXAMPLES
 
-![weather example](etc/weather.png)
+The screenshot in the source etc/weather.png shows the control header
+and four graphs.  The legends show "(min < avg < max) last" of the
+metrics for the displayed time.  The wind graph shows a wind change
+from south to north in the color below 0.
+
+![example](etc/weather.png)
 
 # SEE ALSO
 
@@ -91,7 +97,7 @@ Timothy D Witham <twitham@sbcglobal.net>
 
 # COPYRIGHT AND LICENSE
 
-Copyright 2012-2021 Timothy D Witham.
+Copyright 2012-2026 Timothy D Witham.
 
 This program is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
