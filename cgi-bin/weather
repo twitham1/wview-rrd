@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -T
 
 # weather: RRD CGI graphing frontend by twitham@sbcglobal.net
 # see wview-rrd for the backend data storage job, 2013/01
@@ -45,7 +45,8 @@ if (-f $file and -s $file) {
 }
 
 # override anything above in configuation file
--f "$0.pl" and ! -w  and require "$0.pl";
+my $conf = "$inc/$basename.pl";
+-f $conf and ! -w and require $conf;
 # ------------------------------------------------------------
 
 our $rrd;			# array of graph references

@@ -87,6 +87,20 @@ from south to north in the color below 0.
 
 ![example](etc/weather.png)
 
+# DDoS WARNING!
+
+It is NOT recommended to put this on the internet.
+
+RRDTool is very efficient at generating images on-the-fly and the CGI
+makes a nice interactive interface.  This works well for the expected
+case of real users checking the weather.  But if an evil botnet gets
+the URL and runs this dozens of times per second, this could consume
+your server or network bandwidth.
+
+Yes, DDoS happened to me.  If you put this on the internet, please
+rename the cgi-bin/weather (and its config file) so the URL can't be
+guessed and then do NOT publish the URL anywhere.
+
 # SEE ALSO
 
 rrdtool(1), http://weewx.com/
